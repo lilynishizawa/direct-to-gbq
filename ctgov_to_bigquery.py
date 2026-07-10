@@ -47,12 +47,15 @@ TABLE_SCHEMA = [
     bigquery.SchemaField("primary_completion_date", "STRING"),
     bigquery.SchemaField("completion_date", "STRING"),
     bigquery.SchemaField("lead_sponsor", "STRING"),
+    bigquery.SchemaField("lead_sponsor_class", "STRING"),
     bigquery.SchemaField("conditions", "STRING", mode="REPEATED"),
     bigquery.SchemaField("keywords", "STRING", mode="REPEATED"),
+    bigquery.SchemaField("intervention_types", "STRING", mode="REPEATED"),
     bigquery.SchemaField("enrollment_count", "INTEGER"),
     bigquery.SchemaField("healthy_volunteers", "BOOLEAN"),
     bigquery.SchemaField("sex", "STRING"),
     bigquery.SchemaField("minimum_age_days", "INTEGER"),
+    bigquery.SchemaField("maximum_age_days", "INTEGER"),
     bigquery.SchemaField("brief_summary", "STRING"),
     bigquery.SchemaField("has_results", "BOOLEAN"),
     bigquery.SchemaField("retrieved_at", "TIMESTAMP"),
@@ -135,8 +138,16 @@ def flatten(study, retrieved_at):
     conditions_mod = protocol.get("conditionsModule", {})
     eligibility = protocol.get("eligibilityModule", {})
     description = protocol.get("descriptionModule", {})
+    arms_interventions = protocol.get("armsInterventionsModule", {})
 
     enrollment_count = design.get("enrollmentInfo", {}).get("count")
+    lead_sponsor = sponsor.get("leadSponsor", {})
+
+    intervention_types = sorted({
+        intervention["type"]
+        for intervention in arms_interventions.get("interventions", [])
+        if intervention.get("type")
+    })
 
     return {
         "nct_id": ident.get("nctId"),
@@ -148,13 +159,16 @@ def flatten(study, retrieved_at):
         "start_date": status.get("startDateStruct", {}).get("date"),
         "primary_completion_date": status.get("primaryCompletionDateStruct", {}).get("date"),
         "completion_date": status.get("completionDateStruct", {}).get("date"),
-        "lead_sponsor": sponsor.get("leadSponsor", {}).get("name"),
+        "lead_sponsor": lead_sponsor.get("name"),
+        "lead_sponsor_class": lead_sponsor.get("class"),
         "conditions": conditions_mod.get("conditions", []),
         "keywords": conditions_mod.get("keywords", []),
+        "intervention_types": intervention_types,
         "enrollment_count": int(enrollment_count) if enrollment_count is not None else None,
         "healthy_volunteers": eligibility.get("healthyVolunteers"),
         "sex": eligibility.get("sex"),
         "minimum_age_days": parse_age_to_days(eligibility.get("minimumAge")),
+        "maximum_age_days": parse_age_to_days(eligibility.get("maximumAge")),
         "brief_summary": description.get("briefSummary"),
         "has_results": study.get("hasResults", False),
         "retrieved_at": retrieved_at,
