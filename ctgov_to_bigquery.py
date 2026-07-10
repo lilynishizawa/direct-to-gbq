@@ -31,7 +31,7 @@ PROJECT_ID = "lily123"
 DATASET_ID = "directdata"
 TABLE_ID = "directtable"
 
-TOTAL_RECORDS = 10000
+TOTAL_RECORDS = 100000
 PAGE_SIZE = 1000  # ClinicalTrials.gov API v2 max page size
 
 API_URL = "https://clinicaltrials.gov/api/v2/studies"
