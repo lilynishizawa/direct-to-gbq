@@ -20,9 +20,12 @@ import io
 import json
 import re
 import sys
+import time
 from datetime import datetime, timezone
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from google.cloud import bigquery
 
 # --- Config -----------------------------------------------------------------
@@ -63,9 +66,51 @@ TABLE_SCHEMA = [
 ]
 
 
+def build_session():
+    """Session with HTTP-level retries for connect/read/status failures
+    (handles transient blips like connection resets mid-response)."""
+    session = requests.Session()
+    retry = Retry(
+        total=5,
+        connect=5,
+        read=5,
+        status=5,
+        backoff_factor=2,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET"],
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
+
+MAX_PAGE_ATTEMPTS = 5
+
+
+def fetch_page(session, params):
+    """Fetch a single page, retrying on transient errors that occur outside
+    urllib3's own retry window (e.g. a stream cut off after headers arrive)."""
+    for attempt in range(1, MAX_PAGE_ATTEMPTS + 1):
+        try:
+            resp = session.get(API_URL, params=params, timeout=60)
+            resp.raise_for_status()
+            return resp.json()
+        except (requests.exceptions.ChunkedEncodingError,
+                requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout) as e:
+            if attempt == MAX_PAGE_ATTEMPTS:
+                raise
+            wait = 2 ** attempt
+            print(f"  page fetch failed ({e!r}), retrying in {wait}s "
+                  f"(attempt {attempt}/{MAX_PAGE_ATTEMPTS})...")
+            time.sleep(wait)
+
+
 def fetch_studies(total_records=TOTAL_RECORDS, page_size=PAGE_SIZE):
     """Generator that yields raw study dicts from the ClinicalTrials.gov API,
     paginating with nextPageToken until total_records have been yielded."""
+    session = build_session()
     fetched = 0
     page_token = None
 
@@ -78,9 +123,7 @@ def fetch_studies(total_records=TOTAL_RECORDS, page_size=PAGE_SIZE):
         if page_token:
             params["pageToken"] = page_token
 
-        resp = requests.get(API_URL, params=params, timeout=60)
-        resp.raise_for_status()
-        payload = resp.json()
+        payload = fetch_page(session, params)
 
         studies = payload.get("studies", [])
         if not studies:
