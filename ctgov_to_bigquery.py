@@ -54,6 +54,10 @@ TABLE_SCHEMA = [
     bigquery.SchemaField("conditions", "STRING", mode="REPEATED"),
     bigquery.SchemaField("keywords", "STRING", mode="REPEATED"),
     bigquery.SchemaField("intervention_types", "STRING", mode="REPEATED"),
+    bigquery.SchemaField("interventions", "RECORD", mode="REPEATED", fields=[
+        bigquery.SchemaField("type", "STRING"),
+        bigquery.SchemaField("name", "STRING"),
+    ]),
     bigquery.SchemaField("enrollment_count", "INTEGER"),
     bigquery.SchemaField("healthy_volunteers", "BOOLEAN"),
     bigquery.SchemaField("sex", "STRING"),
@@ -186,9 +190,10 @@ def flatten(study, retrieved_at):
     enrollment_count = design.get("enrollmentInfo", {}).get("count")
     lead_sponsor = sponsor.get("leadSponsor", {})
 
+    interventions = arms_interventions.get("interventions", [])
     intervention_types = sorted({
         intervention["type"]
-        for intervention in arms_interventions.get("interventions", [])
+        for intervention in interventions
         if intervention.get("type")
     })
 
@@ -207,6 +212,10 @@ def flatten(study, retrieved_at):
         "conditions": conditions_mod.get("conditions", []),
         "keywords": conditions_mod.get("keywords", []),
         "intervention_types": intervention_types,
+        "interventions": [
+            {"type": i.get("type"), "name": i.get("name")}
+            for i in interventions
+        ],
         "enrollment_count": int(enrollment_count) if enrollment_count is not None else None,
         "healthy_volunteers": eligibility.get("healthyVolunteers"),
         "sex": eligibility.get("sex"),
