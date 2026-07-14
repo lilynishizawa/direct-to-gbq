@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ClinicalTrials.gov Explorer</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>ClinicalTrials.gov Explorer</h1>
+    <p class="subtitle">{{ '`lily123.directdata.directtable`' }}</p>
+  </header>
+
+  <main>
+    <form id="filters">
+      <div class="filter-grid">
+        <label>
+          Keyword
+          <input type="text" id="keyword" placeholder="title / summary contains...">
+        </label>
+        <label>
+          Condition
+          <input type="text" id="condition" placeholder="e.g. diabetes">
+        </label>
+        <label>
+          Sponsor name
+          <input type="text" id="sponsor" placeholder="e.g. pfizer">
+        </label>
+
+        <label>
+          Status
+          <select id="status" multiple size="5"></select>
+        </label>
+        <label>
+          Study type
+          <select id="study_type" multiple size="3"></select>
+        </label>
+        <label>
+          Phase
+          <select id="phase" multiple size="5"></select>
+        </label>
+        <label>
+          Sponsor class
+          <select id="sponsor_class" multiple size="5"></select>
+        </label>
+        <label>
+          Sex
+          <select id="sex" multiple size="3"></select>
+        </label>
+
+        <label>
+          Healthy volunteers
+          <select id="healthy_volunteers">
+            <option value="">Any</option>
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+        </label>
+        <label>
+          Has results
+          <select id="has_results">
+            <option value="">Any</option>
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+        </label>
+
+        <label>
+          Enrollment min
+          <input type="number" id="enrollment_min" min="0">
+        </label>
+        <label>
+          Enrollment max
+          <input type="number" id="enrollment_max" min="0">
+        </label>
+        <label>
+          Start year from
+          <input type="number" id="start_year_min" placeholder="e.g. 2015">
+        </label>
+        <label>
+          Start year to
+          <input type="number" id="start_year_max" placeholder="e.g. 2024">
+        </label>
+
+        <label>
+          Sort by
+          <select id="sort">
+            <option value="nct_id">NCT ID</option>
+            <option value="brief_title">Title</option>
+            <option value="overall_status">Status</option>
+            <option value="study_type">Study type</option>
+            <option value="start_date">Start date</option>
+            <option value="primary_completion_date">Primary completion date</option>
+            <option value="lead_sponsor">Sponsor</option>
+            <option value="enrollment_count">Enrollment</option>
+            <option value="has_results">Has results</option>
+          </select>
+        </label>
+        <label>
+          Direction
+          <select id="dir">
+            <option value="asc">Ascending</option>
+            <option value="desc">Descending</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button type="submit" id="searchBtn">Search</button>
+        <button type="button" id="resetBtn">Reset</button>
+      </div>
+    </form>
+
+    <section id="status-bar"></section>
+
+    <section id="results">
+      <table id="results-table">
+        <thead>
+          <tr>
+            <th>NCT ID</th>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Phase</th>
+            <th>Study type</th>
+            <th>Start date</th>
+            <th>Sponsor</th>
+            <th>Sponsor class</th>
+            <th>Enrollment</th>
+            <th>Sex</th>
+            <th>Has results</th>
+          </tr>
+        </thead>
+        <tbody id="results-body"></tbody>
+      </table>
+    </section>
+
+    <div class="pagination">
+      <button type="button" id="prevPage">&laquo; Prev</button>
+      <span id="pageInfo"></span>
+      <button type="button" id="nextPage">Next &raquo;</button>
+    </div>
+  </main>
+
+  <div id="modal-overlay" class="hidden">
+    <div id="modal">
+      <button id="modal-close" aria-label="Close">&times;</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <div id="sql-modal-overlay" class="hidden">
+    <div id="sql-modal">
+      <h2>Review query before running</h2>
+      <p class="subtitle">This will be sent to BigQuery. Nothing runs until you confirm.</p>
+      <pre id="sql-preview"></pre>
+      <div id="sql-modal-error" class="sql-error hidden"></div>
+      <div class="actions">
+        <button type="button" id="sql-run-btn">Run query</button>
+        <button type="button" id="sql-cancel-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
