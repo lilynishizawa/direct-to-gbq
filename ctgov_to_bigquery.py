@@ -64,6 +64,20 @@ TABLE_SCHEMA = [
     bigquery.SchemaField("minimum_age_days", "INTEGER"),
     bigquery.SchemaField("maximum_age_days", "INTEGER"),
     bigquery.SchemaField("brief_summary", "STRING"),
+    bigquery.SchemaField("eligibility_criteria", "STRING"),
+    bigquery.SchemaField("inclusion_criteria", "STRING"),
+    bigquery.SchemaField("exclusion_criteria", "STRING"),
+    bigquery.SchemaField("locations", "RECORD", mode="REPEATED", fields=[
+        bigquery.SchemaField("facility", "STRING"),
+        bigquery.SchemaField("city", "STRING"),
+        bigquery.SchemaField("state", "STRING"),
+        bigquery.SchemaField("country", "STRING"),
+        bigquery.SchemaField("status", "STRING"),
+    ]),
+    bigquery.SchemaField("secondary_outcomes", "RECORD", mode="REPEATED", fields=[
+        bigquery.SchemaField("measure", "STRING"),
+        bigquery.SchemaField("time_frame", "STRING"),
+    ]),
     bigquery.SchemaField("has_results", "BOOLEAN"),
     bigquery.SchemaField("retrieved_at", "TIMESTAMP"),
     bigquery.SchemaField("trial", "JSON", mode="REQUIRED"),
@@ -175,6 +189,26 @@ def parse_age_to_days(age_str):
     return int(value) * _AGE_UNIT_TO_DAYS[unit.lower()]
 
 
+_EXCLUSION_HEADER_RE = re.compile(r"\n\s*Exclusion Criteria:?\s*\n", re.IGNORECASE)
+_INCLUSION_HEADER_RE = re.compile(r"^\s*Inclusion Criteria:?\s*\n", re.IGNORECASE)
+
+
+def split_eligibility_criteria(criteria_text):
+    """ClinicalTrials.gov stores inclusion/exclusion criteria as a single
+    free-text field with "Inclusion Criteria:"/"Exclusion Criteria:"
+    headers inside it, not as separate structured fields. This splits on
+    those headers as a best-effort heuristic; source formatting varies, so
+    treat the split as approximate rather than guaranteed-accurate."""
+    if not criteria_text:
+        return None, None
+    match = _EXCLUSION_HEADER_RE.search(criteria_text)
+    if not match:
+        return _INCLUSION_HEADER_RE.sub("", criteria_text).strip(), None
+    inclusion = _INCLUSION_HEADER_RE.sub("", criteria_text[:match.start()]).strip()
+    exclusion = criteria_text[match.end():].strip()
+    return inclusion, exclusion
+
+
 def flatten(study, retrieved_at):
     """Pull out commonly-queried fields; keep the full record in `trial`."""
     protocol = study.get("protocolSection", {})
@@ -186,6 +220,8 @@ def flatten(study, retrieved_at):
     eligibility = protocol.get("eligibilityModule", {})
     description = protocol.get("descriptionModule", {})
     arms_interventions = protocol.get("armsInterventionsModule", {})
+    contacts_locations = protocol.get("contactsLocationsModule", {})
+    outcomes = protocol.get("outcomesModule", {})
 
     enrollment_count = design.get("enrollmentInfo", {}).get("count")
     lead_sponsor = sponsor.get("leadSponsor", {})
@@ -196,6 +232,9 @@ def flatten(study, retrieved_at):
         for intervention in interventions
         if intervention.get("type")
     })
+
+    eligibility_criteria = eligibility.get("eligibilityCriteria")
+    inclusion_criteria, exclusion_criteria = split_eligibility_criteria(eligibility_criteria)
 
     return {
         "nct_id": ident.get("nctId"),
@@ -222,6 +261,23 @@ def flatten(study, retrieved_at):
         "minimum_age_days": parse_age_to_days(eligibility.get("minimumAge")),
         "maximum_age_days": parse_age_to_days(eligibility.get("maximumAge")),
         "brief_summary": description.get("briefSummary"),
+        "eligibility_criteria": eligibility_criteria,
+        "inclusion_criteria": inclusion_criteria,
+        "exclusion_criteria": exclusion_criteria,
+        "locations": [
+            {
+                "facility": loc.get("facility"),
+                "city": loc.get("city"),
+                "state": loc.get("state"),
+                "country": loc.get("country"),
+                "status": loc.get("status"),
+            }
+            for loc in contacts_locations.get("locations", [])
+        ],
+        "secondary_outcomes": [
+            {"measure": o.get("measure"), "time_frame": o.get("timeFrame")}
+            for o in outcomes.get("secondaryOutcomes", [])
+        ],
         "has_results": study.get("hasResults", False),
         "retrieved_at": retrieved_at,
         "trial": study,
