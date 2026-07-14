@@ -1,0 +1,293 @@
+:root {
+  --bg: #f7f7f8;
+  --panel: #ffffff;
+  --border: #d9dce1;
+  --text: #1c1e21;
+  --muted: #6b7280;
+  --accent: #2563eb;
+  --accent-text: #ffffff;
+  --row-hover: #eef2ff;
+  --header-bg: #eef1f5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16181d;
+    --panel: #1f2229;
+    --border: #33363d;
+    --text: #e6e6e6;
+    --muted: #9aa0a8;
+    --accent: #3b82f6;
+    --accent-text: #0b0d10;
+    --row-hover: #262a33;
+    --header-bg: #23262d;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+header {
+  padding: 1.25rem 1.5rem 0.5rem;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.subtitle {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-family: monospace;
+}
+
+main {
+  padding: 1rem 1.5rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+#filters {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.75rem 1rem;
+}
+
+.filter-grid label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.78rem;
+  color: var(--muted);
+  gap: 0.3rem;
+}
+
+input, select {
+  font: inherit;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.actions {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+button {
+  font: inherit;
+  padding: 0.45rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+
+#searchBtn {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+button:hover {
+  filter: brightness(1.05);
+}
+
+#status-bar {
+  margin: 0.75rem 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  min-height: 1.2em;
+}
+
+#results {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+}
+
+th, td {
+  padding: 0.5rem 0.65rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+th {
+  background: var(--header-bg);
+  position: sticky;
+  top: 0;
+}
+
+tbody tr {
+  cursor: pointer;
+}
+
+tbody tr:hover {
+  background: var(--row-hover);
+}
+
+.pagination {
+  margin-top: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.85rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  border: 1px solid var(--border);
+  background: var(--header-bg);
+}
+
+#modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 3rem 1rem;
+  overflow-y: auto;
+}
+
+#modal-overlay.hidden {
+  display: none;
+}
+
+#modal {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.5rem;
+  max-width: 800px;
+  width: 100%;
+}
+
+#modal-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  border: none;
+  background: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+#modal-body h2 {
+  margin-top: 0;
+  font-size: 1.15rem;
+}
+
+#modal-body .field {
+  margin-bottom: 0.9rem;
+}
+
+#modal-body .field-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+
+#modal-body .field-value {
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+}
+
+#modal-body table {
+  margin-top: 0.3rem;
+}
+
+#sql-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 3rem 1rem;
+  overflow-y: auto;
+}
+
+#sql-modal-overlay.hidden {
+  display: none;
+}
+
+#sql-modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.5rem;
+  max-width: 800px;
+  width: 100%;
+}
+
+#sql-modal h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+#sql-preview {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.85rem;
+  font-size: 0.8rem;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.sql-error {
+  color: #dc2626;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.sql-error.hidden {
+  display: none;
+}
+
+#sql-run-btn {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+  font-weight: 600;
+}
