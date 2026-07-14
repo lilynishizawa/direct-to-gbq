@@ -136,9 +136,9 @@
     </section>
 
     <div class="pagination">
-      <button type="button" id="prevPage">&laquo; Prev</button>
+      <button type="button" id="prevPage" disabled>&laquo; Prev</button>
       <span id="pageInfo"></span>
-      <button type="button" id="nextPage">Next &raquo;</button>
+      <button type="button" id="nextPage" disabled>Next &raquo;</button>
     </div>
   </main>
 
@@ -152,11 +152,12 @@
   <div id="sql-modal-overlay" class="hidden">
     <div id="sql-modal">
       <h2>Review query before running</h2>
-      <p class="subtitle">This will be sent to BigQuery. Nothing runs until you confirm.</p>
-      <pre id="sql-preview"></pre>
+      <p class="subtitle">Edit the query below if you like, then run it. Nothing executes until you confirm.</p>
+      <textarea id="sql-preview" rows="14" spellcheck="false"></textarea>
       <div id="sql-modal-error" class="sql-error hidden"></div>
       <div class="actions">
         <button type="button" id="sql-run-btn">Run query</button>
+        <button type="button" id="sql-reset-btn">Reset to generated</button>
         <button type="button" id="sql-cancel-btn">Cancel</button>
       </div>
     </div>

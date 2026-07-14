@@ -25,6 +25,12 @@ TABLE_REF = f"`{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}`"
 
 MAX_PAGE_SIZE = 200
 DEFAULT_PAGE_SIZE = 25
+MAX_CUSTOM_SQL_ROWS = 500
+
+FORBIDDEN_SQL_KEYWORDS = re.compile(
+    r"\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|MERGE|TRUNCATE|GRANT|REVOKE|CALL|EXPORT|LOAD)\b",
+    re.IGNORECASE,
+)
 
 SORTABLE_COLUMNS = {
     "nct_id", "brief_title", "overall_status", "study_type", "start_date",
@@ -61,6 +67,23 @@ def parse_bool_flag(raw):
     if raw == "false":
         return False
     return None
+
+
+def sanitize_single_select(raw_sql):
+    """Allow the user to edit the generated SQL and run their edited version,
+    while still guarding against multiple statements or anything other than
+    a read-only SELECT (no bound parameters here since the text itself may
+    have been hand-edited)."""
+    stripped = raw_sql.strip()
+    if stripped.endswith(";"):
+        stripped = stripped[:-1].rstrip()
+    if ";" in stripped:
+        raise QueryBuildError("Only a single statement is allowed")
+    if not re.match(r"^(SELECT|WITH)\b", stripped, re.IGNORECASE):
+        raise QueryBuildError("Only SELECT queries are allowed")
+    if FORBIDDEN_SQL_KEYWORDS.search(stripped):
+        raise QueryBuildError("Query contains a disallowed keyword")
+    return stripped
 
 
 def sql_literal(value, type_):
@@ -129,7 +152,22 @@ def build_search_query(args):
     multi_filter("overall_status", "statuses", args.getlist("status"), scalar_when_single=True)
     multi_filter("study_type", "study_types", args.getlist("study_type"))
     multi_filter("lead_sponsor_class", "sponsor_classes", args.getlist("sponsor_class"))
-    multi_filter("sex", "sexes", args.getlist("sex"), scalar_when_single=True)
+
+    # A trial restricted to "ALL" sexes is eligible for male and female
+    # participants alike, so selecting MALE or FEMALE should also match
+    # ALL-sex trials; selecting ALL by itself should not pull in MALE/FEMALE.
+    sex_selected = [v for v in args.getlist("sex") if v]
+    if sex_selected:
+        sexes = set(sex_selected)
+        if sexes & {"MALE", "FEMALE"}:
+            sexes.add("ALL")
+        sexes = sorted(sexes)
+        if len(sexes) == 1:
+            where_clauses.append("sex = @sexes")
+            params.append(bigquery.ScalarQueryParameter("sexes", "STRING", sexes[0]))
+        else:
+            where_clauses.append("sex IN UNNEST(@sexes)")
+            params.append(bigquery.ArrayQueryParameter("sexes", "STRING", sexes))
 
     phases = [p for p in args.getlist("phase") if p]
     if phases:
@@ -239,6 +277,32 @@ def api_search():
         r.pop("total_count", None)
 
     return jsonify({"rows": rows, "total": total, "page": page, "page_size": page_size})
+
+
+@app.route("/api/execute-sql", methods=["POST"])
+def api_execute_sql():
+    """Runs a user-supplied (possibly hand-edited) SQL query verbatim.
+    Since the text may no longer match anything build_search_query produced,
+    results are returned with whatever columns the query itself selects,
+    rather than the fixed search-result schema."""
+    body = request.get_json(silent=True) or {}
+    raw_sql = (body.get("sql") or "").strip()
+    if not raw_sql:
+        return jsonify({"error": "No SQL provided"}), 400
+
+    try:
+        sql = sanitize_single_select(raw_sql)
+    except QueryBuildError as e:
+        return jsonify({"error": str(e)}), 400
+
+    try:
+        result = client.query(sql).result(max_results=MAX_CUSTOM_SQL_ROWS)
+        columns = [field.name for field in result.schema]
+        rows = [row_to_dict(r) for r in result]
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+    return jsonify({"columns": columns, "rows": rows})
 
 
 @app.route("/api/trial/<nct_id>")

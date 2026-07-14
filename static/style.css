@@ -266,13 +266,18 @@ tbody tr:hover {
 }
 
 #sql-preview {
+  display: block;
+  width: 100%;
   background: var(--bg);
+  color: var(--text);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.85rem;
   font-size: 0.8rem;
-  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   white-space: pre;
+  resize: vertical;
+  min-height: 10em;
 }
 
 .sql-error {

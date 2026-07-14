@@ -13,7 +13,28 @@ const FACETS = {
   sex: ["ALL", "MALE", "FEMALE"],
 };
 
-let state = { page: 1, pageSize: 25, approvedSignature: null };
+const SEARCH_COLUMNS = [
+  { key: "nct_id", label: "NCT ID" },
+  { key: "brief_title", label: "Title" },
+  { key: "overall_status", label: "Status", format: (v) => `<span class="badge">${escapeHtml(v)}</span>`, raw: true },
+  { key: "phases", label: "Phase", format: (v) => (v || []).join(", ") },
+  { key: "study_type", label: "Study type" },
+  { key: "start_date", label: "Start date" },
+  { key: "lead_sponsor", label: "Sponsor" },
+  { key: "lead_sponsor_class", label: "Sponsor class" },
+  { key: "enrollment_count", label: "Enrollment" },
+  { key: "sex", label: "Sex" },
+  { key: "has_results", label: "Has results", format: (v) => (v ? "Yes" : "No") },
+];
+
+let state = {
+  page: 1,
+  pageSize: 25,
+  approvedSignature: null,
+  originalSql: "",
+  customMode: false,
+  lastError: "",
+};
 
 function populateFacetSelects() {
   for (const [id, values] of Object.entries(FACETS)) {
@@ -75,32 +96,42 @@ function escapeHtml(str) {
     .replace(/>/g, "&gt;");
 }
 
-function renderRows(rows) {
+function formatCell(value) {
+  if (value === null || value === undefined) return "";
+  if (Array.isArray(value) || typeof value === "object") return JSON.stringify(value);
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  return String(value);
+}
+
+// Renders both the fixed search-result schema and arbitrary custom-query
+// column sets, since an edited query can select whatever columns it likes.
+function renderTable(columns, rows, onRowClick) {
+  const headRow = document.querySelector("#results-table thead tr");
   const body = document.getElementById("results-body");
+  headRow.innerHTML = columns.map((c) => `<th>${escapeHtml(c.label)}</th>`).join("");
   body.innerHTML = "";
+
   for (const row of rows) {
     const tr = document.createElement("tr");
-    tr.dataset.nctId = row.nct_id;
-    tr.innerHTML = `
-      <td>${escapeHtml(row.nct_id)}</td>
-      <td title="${escapeHtml(row.brief_title)}">${escapeHtml(row.brief_title)}</td>
-      <td><span class="badge">${escapeHtml(row.overall_status)}</span></td>
-      <td>${escapeHtml((row.phases || []).join(", "))}</td>
-      <td>${escapeHtml(row.study_type)}</td>
-      <td>${escapeHtml(row.start_date)}</td>
-      <td title="${escapeHtml(row.lead_sponsor)}">${escapeHtml(row.lead_sponsor)}</td>
-      <td>${escapeHtml(row.lead_sponsor_class)}</td>
-      <td>${row.enrollment_count ?? ""}</td>
-      <td>${escapeHtml(row.sex)}</td>
-      <td>${row.has_results ? "Yes" : "No"}</td>
-    `;
-    tr.addEventListener("click", () => openDetail(row.nct_id));
+    tr.innerHTML = columns
+      .map((c) => {
+        const raw = row[c.key];
+        if (c.format && c.raw) return `<td>${c.format(raw)}</td>`;
+        const display = c.format ? c.format(raw) : formatCell(raw);
+        return `<td title="${escapeHtml(display)}">${escapeHtml(display)}</td>`;
+      })
+      .join("");
+    if (onRowClick) {
+      tr.style.cursor = "pointer";
+      tr.addEventListener("click", () => onRowClick(row));
+    }
     body.appendChild(tr);
   }
 }
 
 async function runSearch(page) {
   state.page = page;
+  state.customMode = false;
   const statusBar = document.getElementById("status-bar");
   statusBar.textContent = "Loading...";
   const params = buildParams(page);
@@ -109,19 +140,57 @@ async function runSearch(page) {
     const resp = await fetch(`/api/search?${params.toString()}`);
     const data = await resp.json();
     if (!resp.ok) {
-      statusBar.textContent = `Error: ${data.error || resp.statusText}`;
+      state.lastError = data.error || resp.statusText;
+      statusBar.textContent = `Error: ${state.lastError}`;
       document.getElementById("results-body").innerHTML = "";
-      return;
+      return false;
     }
-    renderRows(data.rows);
+    renderTable(SEARCH_COLUMNS, data.rows, (row) => openDetail(row.nct_id));
     const totalPages = Math.max(Math.ceil(data.total / data.page_size), 1);
     document.getElementById("pageInfo").textContent =
       `Page ${data.page} of ${totalPages} (${data.total.toLocaleString()} results)`;
     statusBar.textContent = `${data.total.toLocaleString()} matching trials`;
     document.getElementById("prevPage").disabled = data.page <= 1;
     document.getElementById("nextPage").disabled = data.page >= totalPages;
+    return true;
   } catch (err) {
-    statusBar.textContent = `Error: ${err}`;
+    state.lastError = String(err);
+    statusBar.textContent = `Error: ${state.lastError}`;
+    return false;
+  }
+}
+
+async function runCustomQuery(sql) {
+  state.customMode = true;
+  const statusBar = document.getElementById("status-bar");
+  statusBar.textContent = "Running custom query...";
+
+  try {
+    const resp = await fetch("/api/execute-sql", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sql }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      state.lastError = data.error || resp.statusText;
+      statusBar.textContent = `Error: ${state.lastError}`;
+      document.getElementById("results-body").innerHTML = "";
+      return false;
+    }
+    const columns = data.columns.map((c) => ({ key: c, label: c }));
+    const hasNctId = data.columns.includes("nct_id");
+    renderTable(columns, data.rows, hasNctId ? (row) => openDetail(row.nct_id) : null);
+    document.getElementById("pageInfo").textContent = "";
+    document.getElementById("prevPage").disabled = true;
+    document.getElementById("nextPage").disabled = true;
+    const cappedNote = data.rows.length >= 500 ? " (capped at 500 rows)" : "";
+    statusBar.textContent = `Custom query returned ${data.rows.length} row(s)${cappedNote}.`;
+    return true;
+  } catch (err) {
+    state.lastError = String(err);
+    statusBar.textContent = `Error: ${state.lastError}`;
+    return false;
   }
 }
 
@@ -139,27 +208,31 @@ function hideSqlModal() {
 async function requestSearchApproval(page) {
   const params = buildParams(page);
   const errorBox = document.getElementById("sql-modal-error");
-  const pre = document.getElementById("sql-preview");
+  const textarea = document.getElementById("sql-preview");
   errorBox.classList.add("hidden");
   errorBox.textContent = "";
-  pre.textContent = "Building query...";
+  textarea.value = "Building query...";
+  textarea.disabled = true;
   showSqlModal();
 
   try {
     const resp = await fetch(`/api/search/sql?${params.toString()}`);
     const data = await resp.json();
+    textarea.disabled = false;
     if (!resp.ok) {
-      pre.textContent = "";
+      textarea.value = "";
       errorBox.textContent = data.error || resp.statusText;
       errorBox.classList.remove("hidden");
       document.getElementById("sql-run-btn").dataset.armed = "false";
       return;
     }
-    pre.textContent = data.sql;
+    textarea.value = data.sql;
+    state.originalSql = data.sql;
     document.getElementById("sql-run-btn").dataset.armed = "true";
     document.getElementById("sql-run-btn").dataset.pendingPage = page;
   } catch (err) {
-    pre.textContent = "";
+    textarea.disabled = false;
+    textarea.value = "";
     errorBox.textContent = String(err);
     errorBox.classList.remove("hidden");
     document.getElementById("sql-run-btn").dataset.armed = "false";
@@ -261,9 +334,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     document.getElementById("results-body").innerHTML = "";
     document.getElementById("pageInfo").textContent = "";
+    document.getElementById("prevPage").disabled = true;
+    document.getElementById("nextPage").disabled = true;
     document.getElementById("status-bar").textContent =
       "Set your filters and click Search to preview the query.";
     state.approvedSignature = null;
+    state.customMode = false;
+    state.originalSql = "";
   });
 
   document.getElementById("prevPage").addEventListener("click", () => {
@@ -276,12 +353,35 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.target.id === "modal-overlay") closeModal();
   });
 
-  document.getElementById("sql-run-btn").addEventListener("click", (e) => {
-    if (e.target.dataset.armed !== "true") return;
-    const page = parseInt(e.target.dataset.pendingPage, 10) || 1;
-    state.approvedSignature = filterSignature();
-    hideSqlModal();
-    runSearch(page);
+  document.getElementById("sql-run-btn").addEventListener("click", async (e) => {
+    const btn = e.target;
+    if (btn.dataset.armed !== "true") return;
+    const page = parseInt(btn.dataset.pendingPage, 10) || 1;
+    const currentSql = document.getElementById("sql-preview").value;
+    const errorBox = document.getElementById("sql-modal-error");
+    errorBox.classList.add("hidden");
+    errorBox.textContent = "";
+    btn.disabled = true;
+
+    let ok;
+    if (currentSql.trim() === state.originalSql.trim()) {
+      ok = await runSearch(page);
+      if (ok) state.approvedSignature = filterSignature();
+    } else {
+      ok = await runCustomQuery(currentSql);
+    }
+
+    btn.disabled = false;
+    if (ok) {
+      hideSqlModal();
+    } else {
+      errorBox.textContent = state.lastError || "Query failed.";
+      errorBox.classList.remove("hidden");
+    }
+  });
+  document.getElementById("sql-reset-btn").addEventListener("click", () => {
+    document.getElementById("sql-preview").value = state.originalSql;
+    document.getElementById("sql-modal-error").classList.add("hidden");
   });
   document.getElementById("sql-cancel-btn").addEventListener("click", closeSqlModal);
   document.getElementById("sql-modal-overlay").addEventListener("click", (e) => {
