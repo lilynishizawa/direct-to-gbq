@@ -34,8 +34,10 @@ PROJECT_ID = "lily123"
 DATASET_ID = "directdata"
 TABLE_ID = "directtable"
 
-TOTAL_RECORDS = 100000
+TOTAL_RECORDS = 2000000
 PAGE_SIZE = 1000  # ClinicalTrials.gov API v2 max page size
+LOAD_CHUNK_SIZE = 20000  # rows per BigQuery load job; decoupled from PAGE_SIZE
+                          # to keep job count (and per-job overhead) down
 
 API_URL = "https://clinicaltrials.gov/api/v2/studies"
 
@@ -304,6 +306,7 @@ def ensure_dataset(client, dataset_id):
 
 def main():
     client = bigquery.Client(project=PROJECT_ID)
+    # Creates the `directdata` dataset if it doesn't already exist; no-op otherwise.
     ensure_dataset(client, DATASET_ID)
 
     table_ref = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
@@ -312,9 +315,11 @@ def main():
     print(f"Fetching {TOTAL_RECORDS} studies from ClinicalTrials.gov...")
     rows = (flatten(s, retrieved_at) for s in fetch_studies())
 
-    # Load in chunks so we never hold all 10,000 records' worth of buffers
-    # at once and can stream page-by-page straight into BigQuery.
-    CHUNK_SIZE = PAGE_SIZE
+    # Load in chunks so we never hold all records' worth of buffers at once.
+    # Chunk size is decoupled from the API's page size and set much larger,
+    # since each load job carries several seconds of fixed overhead --
+    # fewer, bigger load jobs beats one job per page at this scale.
+    CHUNK_SIZE = LOAD_CHUNK_SIZE
     chunk = []
     total_loaded = 0
     first_chunk = True
