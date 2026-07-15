@@ -129,7 +129,8 @@ def build_search_query(args):
     condition = args.get("condition", "").strip()
     if condition:
         where_clauses.append(
-            "EXISTS (SELECT 1 FROM UNNEST(conditions) AS c WHERE LOWER(c) LIKE @condition)"
+            "(EXISTS (SELECT 1 FROM UNNEST(conditions) AS c WHERE LOWER(c) LIKE @condition) "
+            "OR EXISTS (SELECT 1 FROM UNNEST(keywords) AS k WHERE LOWER(k) LIKE @condition))"
         )
         params.append(bigquery.ScalarQueryParameter("condition", "STRING", f"%{condition.lower()}%"))
 
