@@ -9,4 +9,8 @@ UI improvement
     Secondary outcomes has <br> instead of actual breaks
 New fields or updated fields
     Age days -> years
-    Include age in search options
+    Include age in initial (hard) search options
+If optional info is empty, then prompt for it "Please enter if you want AI to filter for these results"
+Once results come up, pop up where "Run with AI? Approx cost: __" with Yes or Cancel option
+MeSH filtering
+AI filtered eligibility should show up on the left side of the original results instead of a new set of results being pasted at the bottom. Add header above results. 
