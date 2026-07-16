@@ -34,6 +34,9 @@ let state = {
   originalSql: "",
   customMode: false,
   lastError: "",
+  fuzzyCandidates: null,
+  fuzzyResults: {},
+  fuzzyPromptNctIds: [],
 };
 
 const LABEL_OVERRIDES = {
@@ -314,6 +317,225 @@ function goToPage(page) {
   }
 }
 
+// ---------- Fuzzy match ----------
+
+function getPatientProfile() {
+  return {
+    age: document.getElementById("patient-age").value,
+    sex: document.getElementById("patient-sex").value,
+    notes: document.getElementById("patient-notes").value.trim(),
+  };
+}
+
+function patientProfileValid(patient) {
+  return Boolean(patient.sex) && patient.age !== "" && !isNaN(Number(patient.age));
+}
+
+function resetFuzzyPanel(message) {
+  state.fuzzyCandidates = null;
+  document.getElementById("fuzzy-status").textContent = message;
+  document.getElementById("fuzzy-warning").classList.add("hidden");
+  document.getElementById("fuzzy-results").classList.add("hidden");
+  document.getElementById("fuzzy-run-btn").disabled = true;
+}
+
+// The main search's filters ARE the hard criteria -- whatever trials the
+// search matches (across all pages, not just the visible one) become the
+// candidate pool for AI matching. Called right after a search is approved
+// and run, using the same filter params (minus paging/sort).
+async function refreshFuzzyCandidates() {
+  const statusEl = document.getElementById("fuzzy-status");
+  const warningEl = document.getElementById("fuzzy-warning");
+  const runBtn = document.getElementById("fuzzy-run-btn");
+  warningEl.classList.add("hidden");
+  document.getElementById("fuzzy-results").classList.add("hidden");
+  state.fuzzyCandidates = null;
+  runBtn.disabled = true;
+  statusEl.textContent = "Checking how many searched trials qualify for AI matching...";
+
+  const params = buildParams(1);
+  params.delete("page");
+  params.delete("page_size");
+  params.delete("sort");
+  params.delete("dir");
+
+  try {
+    const resp = await fetch(`/api/fuzzy-match/candidates?${params.toString()}`);
+    const data = await resp.json();
+    if (!resp.ok) {
+      statusEl.textContent = `Error: ${data.error || resp.statusText}`;
+      return;
+    }
+    state.fuzzyCandidates = data;
+    if (data.total > 100) {
+      statusEl.textContent = `Your search matched ${data.total.toLocaleString()} trials.`;
+      warningEl.textContent = `Too many matching trials (${data.total.toLocaleString()}) to run AI matching -- narrow your search filters to 100 or fewer trials.`;
+      warningEl.classList.remove("hidden");
+      runBtn.disabled = true;
+    } else {
+      statusEl.textContent = `Your search matched ${data.total} trial${data.total === 1 ? "" : "s"}${data.total > 0 ? " -- ready to run the AI match." : "."}`;
+      runBtn.disabled = data.total === 0;
+    }
+  } catch (err) {
+    statusEl.textContent = `Error: ${err}`;
+  }
+}
+
+function showFuzzyModal() {
+  document.getElementById("fuzzy-modal-overlay").classList.remove("hidden");
+}
+
+function hideFuzzyModal() {
+  document.getElementById("fuzzy-modal-overlay").classList.add("hidden");
+  document.getElementById("fuzzy-modal-run-btn").dataset.armed = "false";
+}
+
+async function openFuzzyPromptModal() {
+  if (!state.fuzzyCandidates || !state.fuzzyCandidates.trials || !state.fuzzyCandidates.trials.length) return;
+  const patient = getPatientProfile();
+  if (!patientProfileValid(patient)) {
+    document.getElementById("fuzzy-status").textContent = "Enter the patient's age and sex above before running the AI match.";
+    return;
+  }
+  const nctIds = state.fuzzyCandidates.trials.map((t) => t.nct_id);
+  const textarea = document.getElementById("fuzzy-prompt-preview");
+  const errorBox = document.getElementById("fuzzy-modal-error");
+  errorBox.classList.add("hidden");
+  errorBox.textContent = "";
+  textarea.value = "Building prompt...";
+  document.getElementById("fuzzy-modal-run-btn").dataset.armed = "false";
+  showFuzzyModal();
+
+  try {
+    const resp = await fetch("/api/fuzzy-match/prompt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ patient, nct_ids: nctIds }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      textarea.value = "";
+      errorBox.textContent = data.error || resp.statusText;
+      errorBox.classList.remove("hidden");
+      return;
+    }
+    textarea.value = data.prompt;
+    state.fuzzyPromptNctIds = nctIds;
+    document.getElementById("fuzzy-modal-run-btn").dataset.armed = "true";
+  } catch (err) {
+    textarea.value = "";
+    errorBox.textContent = String(err);
+    errorBox.classList.remove("hidden");
+  }
+}
+
+function applyFuzzyResults(results) {
+  const titleById = {};
+  for (const t of state.fuzzyCandidates.trials) titleById[t.nct_id] = t.brief_title;
+
+  state.fuzzyResults = {};
+  for (const r of results) state.fuzzyResults[r.nct_id] = r;
+
+  const rank = { Eligible: 0, Ineligible: 1, Uncertain: 2 };
+  const sorted = [...results].sort((a, b) => (rank[a.overall] ?? 3) - (rank[b.overall] ?? 3));
+
+  const counts = { Eligible: 0, Uncertain: 0, Ineligible: 0 };
+  for (const r of results) {
+    if (counts[r.overall] !== undefined) counts[r.overall]++;
+  }
+  document.getElementById("fuzzy-counts").textContent =
+    `${counts.Eligible} Eligible, ${counts.Uncertain} Uncertain, ${counts.Ineligible} Ineligible`;
+
+  const body = document.getElementById("fuzzy-body");
+  body.innerHTML = "";
+  for (const r of sorted) {
+    const tr = document.createElement("tr");
+    const badgeClass = `fuzzy-badge-${(r.overall || "").toLowerCase()}`;
+    tr.innerHTML =
+      `<td>${escapeHtml(r.nct_id)}</td>` +
+      `<td>${escapeHtml(titleById[r.nct_id] || "")}</td>` +
+      `<td><span class="badge ${badgeClass}">${escapeHtml(r.overall)}</span></td>`;
+    tr.style.cursor = "pointer";
+    tr.addEventListener("click", () => openDetail(r.nct_id));
+    body.appendChild(tr);
+  }
+  document.getElementById("fuzzy-results").classList.remove("hidden");
+}
+
+async function runFuzzyMatchAi() {
+  const btn = document.getElementById("fuzzy-modal-run-btn");
+  if (btn.dataset.armed !== "true") return;
+  const errorBox = document.getElementById("fuzzy-modal-error");
+  errorBox.classList.add("hidden");
+  errorBox.textContent = "";
+  btn.disabled = true;
+  const originalLabel = btn.textContent;
+  btn.textContent = "Running...";
+
+  const patient = getPatientProfile();
+  try {
+    const resp = await fetch("/api/fuzzy-match/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ patient, nct_ids: state.fuzzyPromptNctIds }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      errorBox.textContent = data.error || resp.statusText;
+      errorBox.classList.remove("hidden");
+      return;
+    }
+    applyFuzzyResults(data.results);
+    hideFuzzyModal();
+  } catch (err) {
+    errorBox.textContent = String(err);
+    errorBox.classList.remove("hidden");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
+}
+
+function showModalTab(tab) {
+  const isDetails = tab === "details";
+  document.getElementById("modal-tab-details").classList.toggle("active", isDetails);
+  document.getElementById("modal-tab-fuzzy").classList.toggle("active", !isDetails);
+  document.getElementById("modal-body").classList.toggle("hidden", !isDetails);
+  document.getElementById("modal-fuzzy-body").classList.toggle("hidden", isDetails);
+}
+
+function renderFuzzyDetail(nctId) {
+  const r = state.fuzzyResults[nctId];
+  const container = document.getElementById("modal-fuzzy-body");
+  if (!r) {
+    container.innerHTML = "";
+    return;
+  }
+  const list = (items) =>
+    items && items.length
+      ? `<ul>${items.map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>`
+      : `<p class="muted">None identified.</p>`;
+
+  container.innerHTML = `
+    <div class="field">
+      <div class="field-label">Overall eligibility</div>
+      <div class="field-value"><span class="badge fuzzy-badge-${(r.overall || "").toLowerCase()}">${escapeHtml(r.overall)}</span></div>
+    </div>
+    <div class="field">
+      <div class="field-label">Criteria that make patient ineligible</div>
+      ${list(r.ineligible_criteria)}
+    </div>
+    <div class="field">
+      <div class="field-label">Uncertain criteria</div>
+      ${list(r.uncertain_criteria)}
+    </div>
+    <div class="field">
+      <div class="field-label">Criteria that make patient eligible</div>
+      ${list(r.eligible_criteria)}
+    </div>
+  `;
+}
+
 function fieldBlock(label, value) {
   if (value === null || value === undefined || value === "") return "";
   return `<div class="field"><div class="field-label">${escapeHtml(label)}</div><div class="field-value">${escapeHtml(value)}</div></div>`;
@@ -322,7 +544,10 @@ function fieldBlock(label, value) {
 async function openDetail(nctId) {
   const overlay = document.getElementById("modal-overlay");
   const body = document.getElementById("modal-body");
+  const tabsEl = document.getElementById("modal-tabs");
   body.innerHTML = "Loading...";
+  body.classList.remove("hidden");
+  tabsEl.classList.add("hidden");
   overlay.classList.remove("hidden");
 
   try {
@@ -370,6 +595,14 @@ async function openDetail(nctId) {
       ${fieldBlock("Has results", t.has_results ? "Yes" : "No")}
       ${fieldBlock("Retrieved at", t.retrieved_at)}
     `;
+
+    if (state.fuzzyResults[nctId]) {
+      tabsEl.classList.remove("hidden");
+      renderFuzzyDetail(nctId);
+      showModalTab("details");
+    } else {
+      document.getElementById("modal-fuzzy-body").innerHTML = "";
+    }
   } catch (err) {
     body.innerHTML = `<p>Error: ${escapeHtml(String(err))}</p>`;
   }
@@ -410,6 +643,9 @@ document.addEventListener("DOMContentLoaded", () => {
     state.approvedSignature = null;
     state.customMode = false;
     state.originalSql = "";
+
+    state.fuzzyResults = {};
+    resetFuzzyPanel("Run a search to see how many trials qualify for AI matching.");
   });
 
   document.getElementById("prevPage").addEventListener("click", () => {
@@ -435,9 +671,15 @@ document.addEventListener("DOMContentLoaded", () => {
     let ok;
     if (currentSql.trim() === state.originalSql.trim()) {
       ok = await runSearch(page);
-      if (ok) state.approvedSignature = filterSignature();
+      if (ok) {
+        state.approvedSignature = filterSignature();
+        refreshFuzzyCandidates();
+      }
     } else {
       ok = await runCustomQuery(currentSql);
+      if (ok) {
+        resetFuzzyPanel("Fuzzy match isn't available for hand-edited SQL results -- run a normal search to use it.");
+      }
     }
 
     btn.disabled = false;
@@ -457,10 +699,21 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.target.id === "sql-modal-overlay") closeSqlModal();
   });
 
+  document.getElementById("modal-tab-details").addEventListener("click", () => showModalTab("details"));
+  document.getElementById("modal-tab-fuzzy").addEventListener("click", () => showModalTab("fuzzy"));
+
+  document.getElementById("fuzzy-run-btn").addEventListener("click", openFuzzyPromptModal);
+  document.getElementById("fuzzy-modal-run-btn").addEventListener("click", runFuzzyMatchAi);
+  document.getElementById("fuzzy-modal-cancel-btn").addEventListener("click", hideFuzzyModal);
+  document.getElementById("fuzzy-modal-overlay").addEventListener("click", (e) => {
+    if (e.target.id === "fuzzy-modal-overlay") hideFuzzyModal();
+  });
+
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       closeModal();
       closeSqlModal();
+      hideFuzzyModal();
       closeAllDropdowns();
     }
   });

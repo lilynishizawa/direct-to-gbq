@@ -162,7 +162,7 @@ main {
   color: var(--muted);
 }
 
-input, select {
+input, select, textarea {
   font: inherit;
   padding: 0.5rem 0.6rem;
   border-radius: 7px;
@@ -172,9 +172,11 @@ input, select {
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
+textarea { resize: vertical; }
+
 input::placeholder { color: var(--muted); opacity: 0.8; }
 
-input:focus, select:focus, .ms-trigger:focus-visible, .ms-option:focus-visible {
+input:focus, select:focus, textarea:focus, .ms-trigger:focus-visible, .ms-option:focus-visible {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
@@ -409,7 +411,7 @@ tbody tr:hover { background: var(--row-hover); }
 
 /* ---------- Detail modal ---------- */
 
-#modal-overlay, #sql-modal-overlay {
+#modal-overlay, #sql-modal-overlay, #fuzzy-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(15, 17, 21, 0.5);
@@ -421,7 +423,7 @@ tbody tr:hover { background: var(--row-hover); }
   overflow-y: auto;
 }
 
-#modal-overlay.hidden, #sql-modal-overlay.hidden {
+#modal-overlay.hidden, #sql-modal-overlay.hidden, #fuzzy-modal-overlay.hidden {
   display: none;
 }
 
@@ -483,7 +485,7 @@ tbody tr:hover { background: var(--row-hover); }
 
 /* ---------- SQL modal ---------- */
 
-#sql-modal {
+#sql-modal, #fuzzy-modal {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -493,7 +495,7 @@ tbody tr:hover { background: var(--row-hover); }
   width: 100%;
 }
 
-#sql-modal h2 {
+#sql-modal h2, #fuzzy-modal h2 {
   margin-top: 0;
   font-size: 1.1rem;
 }
@@ -521,4 +523,162 @@ tbody tr:hover { background: var(--row-hover); }
 
 .sql-error.hidden {
   display: none;
+}
+
+/* ---------- Patient profile ---------- */
+
+.patient-card {
+  margin-bottom: 1.25rem;
+}
+
+.patient-notes-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.9rem;
+}
+
+.patient-notes-label textarea {
+  font-family: inherit;
+}
+
+/* ---------- Fuzzy match panel ---------- */
+
+.fuzzy-card {
+  margin-top: 1.25rem;
+}
+
+.fuzzy-status {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.fuzzy-warning {
+  margin-top: 0.9rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.fuzzy-warning.hidden {
+  display: none;
+}
+
+#fuzzy-results.hidden {
+  display: none;
+}
+
+.fuzzy-counts {
+  margin: 1.1rem 0 0.75rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+#fuzzy-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+}
+
+#fuzzy-table th, #fuzzy-table td {
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+#fuzzy-table tbody tr {
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+#fuzzy-table tbody tr:hover {
+  background: var(--row-hover);
+}
+
+.fuzzy-badge-eligible {
+  background: color-mix(in srgb, #16a34a 18%, transparent);
+  color: #16a34a;
+  border-color: #16a34a;
+}
+
+.fuzzy-badge-ineligible {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.fuzzy-badge-uncertain {
+  background: color-mix(in srgb, #d97706 18%, transparent);
+  color: #d97706;
+  border-color: #d97706;
+}
+
+/* ---------- Trial detail modal tabs ---------- */
+
+.modal-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0 0 1.1rem;
+  padding-right: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-tabs.hidden {
+  display: none;
+}
+
+.modal-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 0.5rem 0.2rem;
+  margin-bottom: -1px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.modal-tab:hover {
+  filter: none;
+  color: var(--text);
+}
+
+.modal-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+#modal-body.hidden, #modal-fuzzy-body.hidden {
+  display: none;
+}
+
+#modal-fuzzy-body ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+#modal-fuzzy-body .muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+#fuzzy-prompt-preview {
+  display: block;
+  width: 100%;
+  background: var(--panel-alt);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 0.9rem;
+  font-size: 0.8rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  resize: vertical;
+  min-height: 10em;
 }

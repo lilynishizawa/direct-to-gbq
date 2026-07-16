@@ -176,6 +176,28 @@
       </div>
     </form>
 
+    <section id="patient-panel" class="filter-card patient-card">
+      <h2 class="section-title">Patient Profile (for fuzzy match)</h2>
+      <div class="filter-grid">
+        <label>
+          <span class="filter-label">Age (years)</span>
+          <input type="number" id="patient-age" min="0" max="130">
+        </label>
+        <label>
+          <span class="filter-label">Sex</span>
+          <select id="patient-sex">
+            <option value="">Select...</option>
+            <option value="MALE">Male</option>
+            <option value="FEMALE">Female</option>
+          </select>
+        </label>
+      </div>
+      <label class="patient-notes-label">
+        <span class="filter-label">Additional clinical information</span>
+        <textarea id="patient-notes" rows="4" placeholder="Diagnoses, medications, prior treatments, biomarkers, etc. -- anything relevant to eligibility"></textarea>
+      </label>
+    </section>
+
     <section id="status-bar"></section>
 
     <section id="results">
@@ -207,12 +229,48 @@
       <span id="pageInfo"></span>
       <button type="button" id="nextPage" class="btn-ghost" disabled>Next &raquo;</button>
     </div>
+
+    <section id="fuzzy-panel" class="filter-card fuzzy-card">
+      <h2 class="section-title">Fuzzy Match</h2>
+      <p class="subtitle">Your search results above are the hard criteria -- whatever trials your filters return are the candidate pool the AI reasons over.</p>
+      <p id="fuzzy-status" class="fuzzy-status">Run a search to see how many trials qualify for AI matching.</p>
+      <div class="actions">
+        <button type="button" id="fuzzy-run-btn" disabled>Run AI match</button>
+      </div>
+      <div id="fuzzy-warning" class="fuzzy-warning hidden"></div>
+
+      <div id="fuzzy-results" class="hidden">
+        <div id="fuzzy-counts" class="fuzzy-counts"></div>
+        <table id="fuzzy-table">
+          <thead><tr><th>NCT ID</th><th>Title</th><th>Overall eligibility</th></tr></thead>
+          <tbody id="fuzzy-body"></tbody>
+        </table>
+      </div>
+    </section>
   </main>
 
   <div id="modal-overlay" class="hidden">
     <div id="modal">
       <button id="modal-close" aria-label="Close">&times;</button>
+      <div id="modal-tabs" class="modal-tabs hidden">
+        <button type="button" class="modal-tab active" id="modal-tab-details">Details</button>
+        <button type="button" class="modal-tab" id="modal-tab-fuzzy">Fuzzy Match Results</button>
+      </div>
       <div id="modal-body"></div>
+      <div id="modal-fuzzy-body" class="hidden"></div>
+    </div>
+  </div>
+
+  <div id="fuzzy-modal-overlay" class="hidden">
+    <div id="fuzzy-modal">
+      <h2>Review AI prompt before running</h2>
+      <p class="subtitle">This is exactly what will be sent to the AI model. Nothing runs until you confirm.</p>
+      <textarea id="fuzzy-prompt-preview" rows="18" spellcheck="false" readonly></textarea>
+      <div id="fuzzy-modal-error" class="sql-error hidden"></div>
+      <div class="actions">
+        <button type="button" id="fuzzy-modal-run-btn">Run AI match</button>
+        <button type="button" id="fuzzy-modal-cancel-btn" class="btn-ghost">Cancel</button>
+      </div>
     </div>
   </div>
 

@@ -3,18 +3,21 @@ Local web front-end for querying the ClinicalTrials.gov BigQuery table
 populated by ctgov_to_bigquery.py.
 
 Setup:
-    pip install flask google-cloud-bigquery
+    pip install flask google-cloud-bigquery anthropic
 
 Auth: same as ctgov_to_bigquery.py (ADC or GOOGLE_APPLICATION_CREDENTIALS).
+Fuzzy match also calls the Claude API (ANTHROPIC_API_KEY or `ant auth login`).
 
 Usage:
     python app.py
     -> open http://127.0.0.1:5000
 """
 
+import json
 import re
 from datetime import datetime, date
 
+import anthropic
 from flask import Flask, render_template, request, jsonify
 from google.cloud import bigquery
 
@@ -26,6 +29,9 @@ TABLE_REF = f"`{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}`"
 MAX_PAGE_SIZE = 200
 DEFAULT_PAGE_SIZE = 25
 MAX_CUSTOM_SQL_ROWS = 500
+
+FUZZY_MATCH_MODEL = "claude-opus-4-8"
+FUZZY_MATCH_MAX_TRIALS = 100
 
 FORBIDDEN_SQL_KEYWORDS = re.compile(
     r"\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|MERGE|TRUNCATE|GRANT|REVOKE|CALL|EXPORT|LOAD)\b",
@@ -111,10 +117,10 @@ def render_display_sql(query, params):
     return display.strip()
 
 
-def build_search_query(args):
-    """Build the parameterized SEARCH query plus a human-readable rendering
-    of it. Returns (query, params, display_sql, page, page_size); raises
-    QueryBuildError on bad input."""
+def build_filter_clauses(args):
+    """Build the WHERE clauses + bound params shared by the search endpoint
+    and the fuzzy-match candidate lookup. Raises QueryBuildError on bad
+    input."""
     where_clauses = []
     params = []
 
@@ -210,6 +216,15 @@ def build_search_query(args):
                 raise QueryBuildError(f"{field} must be an integer")
             where_clauses.append(f"SAFE_CAST(SUBSTR(start_date, 1, 4) AS INT64) {op} @{param_name}")
             params.append(bigquery.ScalarQueryParameter(param_name, "INT64", value))
+
+    return where_clauses, params
+
+
+def build_search_query(args):
+    """Build the parameterized SEARCH query plus a human-readable rendering
+    of it. Returns (query, params, display_sql, page, page_size); raises
+    QueryBuildError on bad input."""
+    where_clauses, params = build_filter_clauses(args)
 
     sort = args.get("sort", "nct_id")
     if sort not in SORTABLE_COLUMNS:
@@ -327,6 +342,230 @@ def api_trial(nct_id):
     if not result:
         return jsonify({"error": "not found"}), 404
     return jsonify(row_to_dict(result[0]))
+
+
+FUZZY_TRIAL_COLUMNS = """
+    nct_id, brief_title, sex, minimum_age_days, maximum_age_days,
+    brief_summary, inclusion_criteria, exclusion_criteria
+"""
+
+FUZZY_MATCH_INSTRUCTIONS = """You are a clinical trials reader.
+
+Using only the patient information and each trial's inclusion/exclusion criteria given below, determine the patient's eligibility for every listed clinical trial.
+
+For each trial, decide an overall eligibility of "Eligible", "Ineligible", or "Uncertain" -- use "Uncertain" when the criteria don't give you enough information to decide confidently either way. Then list out, as short bullet-style statements:
+- which specific criteria make the patient ineligible
+- which specific criteria you are uncertain about
+- which specific criteria make the patient eligible
+
+Base your judgment only on the information provided below. Do not assume anything about the patient that was not stated."""
+
+
+def parse_patient_json(body):
+    """Parse and validate the patient profile from a JSON request body.
+    Raises QueryBuildError on bad input."""
+    patient = body.get("patient") or {}
+
+    sex = str(patient.get("sex", "")).strip().upper()
+    if sex not in ("MALE", "FEMALE"):
+        raise QueryBuildError("patient.sex must be MALE or FEMALE")
+
+    try:
+        age = float(patient.get("age"))
+    except (TypeError, ValueError):
+        raise QueryBuildError("patient.age must be a number")
+    if age < 0 or age > 130:
+        raise QueryBuildError("patient.age must be between 0 and 130")
+
+    notes = str(patient.get("notes") or "").strip()
+    return {"sex": sex, "age": age, "notes": notes}
+
+
+def fetch_trials_by_ids(nct_ids):
+    """Fetch the fuzzy-match trial columns for a specific list of NCT IDs,
+    preserving the input order."""
+    if not nct_ids:
+        return []
+    query = f"SELECT {FUZZY_TRIAL_COLUMNS} FROM {TABLE_REF} WHERE nct_id IN UNNEST(@nct_ids)"
+    job_config = bigquery.QueryJobConfig(query_parameters=[
+        bigquery.ArrayQueryParameter("nct_ids", "STRING", nct_ids)
+    ])
+    rows_by_id = {r["nct_id"]: row_to_dict(r) for r in client.query(query, job_config=job_config).result()}
+    return [rows_by_id[n] for n in nct_ids if n in rows_by_id]
+
+
+def format_patient_block(patient):
+    lines = [f"Age: {patient['age']} years", f"Sex: {patient['sex']}"]
+    if patient.get("notes"):
+        lines.append(f"Additional information: {patient['notes']}")
+    return "\n".join(lines)
+
+
+def format_trial_block(trial):
+    return (
+        f"NCT ID: {trial['nct_id']}\n"
+        f"Title: {trial.get('brief_title') or ''}\n"
+        f"Sex requirement: {trial.get('sex') or 'ALL'}\n"
+        f"Minimum age (days): {trial.get('minimum_age_days')}\n"
+        f"Maximum age (days): {trial.get('maximum_age_days')}\n"
+        f"Brief summary: {trial.get('brief_summary') or ''}\n"
+        f"Inclusion criteria: {trial.get('inclusion_criteria') or ''}\n"
+        f"Exclusion criteria: {trial.get('exclusion_criteria') or ''}"
+    )
+
+
+def build_fuzzy_prompt(patient, trials):
+    trial_blocks = "\n\n".join(format_trial_block(t) for t in trials)
+    return (
+        f"{FUZZY_MATCH_INSTRUCTIONS}\n\n"
+        f"Patient information:\n{format_patient_block(patient)}\n\n"
+        f"Trials:\n\n{trial_blocks}"
+    )
+
+
+def build_fuzzy_result_schema(nct_ids):
+    return {
+        "type": "object",
+        "properties": {
+            "results": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "nct_id": {"type": "string", "enum": nct_ids},
+                        "overall": {"type": "string", "enum": ["Eligible", "Ineligible", "Uncertain"]},
+                        "ineligible_criteria": {"type": "array", "items": {"type": "string"}},
+                        "uncertain_criteria": {"type": "array", "items": {"type": "string"}},
+                        "eligible_criteria": {"type": "array", "items": {"type": "string"}},
+                    },
+                    "required": [
+                        "nct_id", "overall", "ineligible_criteria",
+                        "uncertain_criteria", "eligible_criteria",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        "required": ["results"],
+        "additionalProperties": False,
+    }
+
+
+@app.route("/api/fuzzy-match/candidates")
+def api_fuzzy_match_candidates():
+    """The current search filters *are* the hard criteria -- whatever the
+    main search returns (sex, status, age once that filter exists, etc.) is
+    the candidate pool for AI matching. Returns the matching total, plus the
+    trial list itself when it's small enough to feed to the AI step."""
+    try:
+        where_clauses, params = build_filter_clauses(request.args)
+    except QueryBuildError as e:
+        return jsonify({"error": str(e)}), 400
+
+    where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
+
+    try:
+        count_query = f"SELECT COUNT(*) AS total FROM {TABLE_REF} WHERE {where_sql}"
+        job_config = bigquery.QueryJobConfig(query_parameters=params)
+        total = list(client.query(count_query, job_config=job_config).result())[0]["total"]
+
+        if total > FUZZY_MATCH_MAX_TRIALS:
+            return jsonify({"total": total, "trials": None})
+
+        detail_query = f"""
+            SELECT nct_id, brief_title
+            FROM {TABLE_REF}
+            WHERE {where_sql}
+            ORDER BY nct_id
+            LIMIT {FUZZY_MATCH_MAX_TRIALS}
+        """
+        job_config = bigquery.QueryJobConfig(query_parameters=params)
+        rows = [row_to_dict(r) for r in client.query(detail_query, job_config=job_config).result()]
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+    return jsonify({"total": total, "trials": rows})
+
+
+@app.route("/api/fuzzy-match/prompt", methods=["POST"])
+def api_fuzzy_match_prompt():
+    """Returns the exact prompt text that /api/fuzzy-match/run would send to
+    Claude, so the user can review it before anything runs."""
+    body = request.get_json(silent=True) or {}
+    try:
+        patient = parse_patient_json(body)
+    except QueryBuildError as e:
+        return jsonify({"error": str(e)}), 400
+
+    nct_ids = body.get("nct_ids") or []
+    if not nct_ids:
+        return jsonify({"error": "No trials provided"}), 400
+    if len(nct_ids) > FUZZY_MATCH_MAX_TRIALS:
+        return jsonify({"error": f"Too many trials (max {FUZZY_MATCH_MAX_TRIALS})"}), 400
+
+    try:
+        trials = fetch_trials_by_ids(nct_ids)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"prompt": build_fuzzy_prompt(patient, trials)})
+
+
+@app.route("/api/fuzzy-match/run", methods=["POST"])
+def api_fuzzy_match_run():
+    """Runs the AI eligibility check over the given trials. Refuses to run
+    when there are more than FUZZY_MATCH_MAX_TRIALS -- the front end should
+    already be blocking that, but this is the real gate."""
+    body = request.get_json(silent=True) or {}
+    try:
+        patient = parse_patient_json(body)
+    except QueryBuildError as e:
+        return jsonify({"error": str(e)}), 400
+
+    nct_ids = body.get("nct_ids") or []
+    if not nct_ids:
+        return jsonify({"error": "No trials provided"}), 400
+    if len(nct_ids) > FUZZY_MATCH_MAX_TRIALS:
+        return jsonify({"error": f"Too many trials to run AI matching on (max {FUZZY_MATCH_MAX_TRIALS})"}), 400
+
+    try:
+        trials = fetch_trials_by_ids(nct_ids)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+    prompt = build_fuzzy_prompt(patient, trials)
+    schema = build_fuzzy_result_schema([t["nct_id"] for t in trials])
+
+    try:
+        ai_client = anthropic.Anthropic()
+        with ai_client.messages.stream(
+            model=FUZZY_MATCH_MODEL,
+            max_tokens=32000,
+            thinking={"type": "adaptive"},
+            output_config={"effort": "high", "format": {"type": "json_schema", "schema": schema}},
+            messages=[{"role": "user", "content": prompt}],
+        ) as stream:
+            response = stream.get_final_message()
+    except anthropic.RateLimitError:
+        return jsonify({"error": "Rate limited by the AI provider. Please wait and try again."}), 429
+    except anthropic.APIStatusError as e:
+        return jsonify({"error": f"AI request failed: {e.message}"}), 502
+    except anthropic.APIConnectionError as e:
+        return jsonify({"error": f"Could not reach the AI provider: {e}"}), 502
+    except Exception as e:
+        return jsonify({"error": f"AI request failed: {e}"}), 502
+
+    if response.stop_reason == "refusal":
+        return jsonify({"error": "The AI declined to process this request."}), 502
+
+    text = next((b.text for b in response.content if b.type == "text"), None)
+    if not text:
+        return jsonify({"error": "AI returned no output"}), 502
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return jsonify({"error": "AI returned invalid JSON"}), 502
+
+    return jsonify({"results": parsed.get("results", [])})
 
 
 if __name__ == "__main__":
