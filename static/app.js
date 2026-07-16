@@ -36,20 +36,82 @@ let state = {
   lastError: "",
 };
 
+const LABEL_OVERRIDES = {
+  NA: "N/A",
+  NIH: "NIH",
+  FED: "Federal",
+  INDIV: "Individual",
+  AMBIG: "Ambiguous",
+  OTHER_GOV: "Other Gov't",
+};
+
+function labelize(value) {
+  if (LABEL_OVERRIDES[value]) return LABEL_OVERRIDES[value];
+  return value
+    .toLowerCase()
+    .split("_")
+    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function updateTriggerText(id) {
+  const count = document.querySelectorAll(`#${id}-panel .ms-option.selected`).length;
+  document.getElementById(`${id}-text`).textContent = count === 0 ? "Any" : `${count} selected`;
+}
+
 function populateFacetSelects() {
   for (const [id, values] of Object.entries(FACETS)) {
-    const select = document.getElementById(id);
+    const panel = document.getElementById(`${id}-panel`);
     for (const v of values) {
-      const opt = document.createElement("option");
-      opt.value = v;
-      opt.textContent = v;
-      select.appendChild(opt);
+      const opt = document.createElement("div");
+      opt.className = "ms-option";
+      opt.dataset.value = v;
+      opt.setAttribute("role", "option");
+      opt.setAttribute("aria-selected", "false");
+      opt.innerHTML = `<span class="ms-check" aria-hidden="true">&#10003;</span><span>${escapeHtml(labelize(v))}</span>`;
+      opt.addEventListener("click", () => {
+        const selected = opt.classList.toggle("selected");
+        opt.setAttribute("aria-selected", String(selected));
+        updateTriggerText(id);
+      });
+      panel.appendChild(opt);
     }
   }
 }
 
 function selectedValues(id) {
-  return Array.from(document.getElementById(id).selectedOptions).map((o) => o.value);
+  return Array.from(document.querySelectorAll(`#${id}-panel .ms-option.selected`)).map((o) => o.dataset.value);
+}
+
+function clearFacetGroup(id) {
+  document.querySelectorAll(`#${id}-panel .ms-option.selected`).forEach((o) => {
+    o.classList.remove("selected");
+    o.setAttribute("aria-selected", "false");
+  });
+  updateTriggerText(id);
+}
+
+function closeAllDropdowns() {
+  document.querySelectorAll(".ms-panel").forEach((p) => p.classList.add("hidden"));
+  document.querySelectorAll(".ms-trigger").forEach((t) => t.setAttribute("aria-expanded", "false"));
+}
+
+function initDropdowns() {
+  for (const id of Object.keys(FACETS)) {
+    const trigger = document.getElementById(`${id}-trigger`);
+    const panel = document.getElementById(`${id}-panel`);
+    trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isOpen = !panel.classList.contains("hidden");
+      closeAllDropdowns();
+      if (!isOpen) {
+        panel.classList.remove("hidden");
+        trigger.setAttribute("aria-expanded", "true");
+      }
+    });
+    panel.addEventListener("click", (e) => e.stopPropagation());
+  }
+  document.addEventListener("click", () => closeAllDropdowns());
 }
 
 function buildParams(page) {
@@ -108,8 +170,13 @@ function formatCell(value) {
 function renderTable(columns, rows, onRowClick) {
   const headRow = document.querySelector("#results-table thead tr");
   const body = document.getElementById("results-body");
+  const emptyState = document.getElementById("empty-state");
   headRow.innerHTML = columns.map((c) => `<th>${escapeHtml(c.label)}</th>`).join("");
   body.innerHTML = "";
+  emptyState.classList.toggle("hidden", rows.length > 0);
+  if (rows.length === 0) {
+    emptyState.querySelector("p").textContent = "No trials matched these filters.";
+  }
 
   for (const row of rows) {
     const tr = document.createElement("tr");
@@ -319,6 +386,7 @@ function closeSqlModal() {
 
 document.addEventListener("DOMContentLoaded", () => {
   populateFacetSelects();
+  initDropdowns();
   document.getElementById("status-bar").textContent =
     "Set your filters and click Search to preview the query.";
 
@@ -330,9 +398,10 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("resetBtn").addEventListener("click", () => {
     document.getElementById("filters").reset();
     for (const id of ["status", "study_type", "phase", "sponsor_class", "sex"]) {
-      Array.from(document.getElementById(id).options).forEach((o) => (o.selected = false));
+      clearFacetGroup(id);
     }
     document.getElementById("results-body").innerHTML = "";
+    document.getElementById("empty-state").classList.remove("hidden");
     document.getElementById("pageInfo").textContent = "";
     document.getElementById("prevPage").disabled = true;
     document.getElementById("nextPage").disabled = true;
@@ -392,6 +461,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Escape") {
       closeModal();
       closeSqlModal();
+      closeAllDropdowns();
     }
   });
 });
