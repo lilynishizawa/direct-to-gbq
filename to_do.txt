@@ -1,0 +1,12 @@
+Query result mismatch between clinicaltrials.gov and BigQuery
+    Make probe program
+Fuzzy match
+    First, hard criteria must run (sex, age, etc.)
+    Then, have button to run AI over the trials (and show prompt, don't run without confirmation)
+    Then, as long as there are less than 100 matches, run AI over them
+    If over 100, pop up warning and stop AI
+UI improvement
+    Secondary outcomes has <br> instead of actual breaks
+New fields or updated fields
+    Age days -> years
+    Include age in search options
