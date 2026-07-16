@@ -51,6 +51,10 @@
               <span class="filter-label">Sponsor name</span>
               <input type="text" id="sponsor" placeholder="e.g. pfizer">
             </label>
+            <label>
+              <span class="filter-label">Patient age (years)</span>
+              <input type="number" id="age" min="0" max="130" placeholder="e.g. 45">
+            </label>
           </div>
         </div>
 
@@ -110,8 +114,8 @@
           </div>
         </div>
 
-        <div class="filter-section">
-          <h2 class="section-title">Refine</h2>
+        <details class="filter-section" id="refine-section">
+          <summary class="section-title">Refine</summary>
           <div class="filter-grid">
             <label>
               <span class="filter-label">Healthy volunteers</span>
@@ -167,7 +171,7 @@
               </select>
             </label>
           </div>
-        </div>
+        </details>
 
         <div class="actions">
           <button type="submit" id="searchBtn">Search</button>
@@ -178,20 +182,7 @@
 
     <section id="patient-panel" class="filter-card patient-card">
       <h2 class="section-title">Patient Profile (for fuzzy match)</h2>
-      <div class="filter-grid">
-        <label>
-          <span class="filter-label">Age (years)</span>
-          <input type="number" id="patient-age" min="0" max="130">
-        </label>
-        <label>
-          <span class="filter-label">Sex</span>
-          <select id="patient-sex">
-            <option value="">Select...</option>
-            <option value="MALE">Male</option>
-            <option value="FEMALE">Female</option>
-          </select>
-        </label>
-      </div>
+      <p class="subtitle">Age and sex come from the search filters above. Anything else relevant to eligibility goes here.</p>
       <label class="patient-notes-label">
         <span class="filter-label">Additional clinical information</span>
         <textarea id="patient-notes" rows="4" placeholder="Diagnoses, medications, prior treatments, biomarkers, etc. -- anything relevant to eligibility"></textarea>
@@ -271,6 +262,16 @@
       <div class="actions">
         <button type="button" id="fuzzy-modal-run-btn">Run AI match</button>
         <button type="button" id="fuzzy-modal-cancel-btn" class="btn-ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirm-modal-overlay" class="hidden">
+    <div id="confirm-modal">
+      <p id="confirm-modal-message"></p>
+      <div class="actions">
+        <button type="button" id="confirm-modal-yes-btn">Yes</button>
+        <button type="button" id="confirm-modal-cancel-btn" class="btn-ghost">Cancel</button>
       </div>
     </div>
   </div>

@@ -144,6 +144,32 @@ main {
   color: var(--muted);
 }
 
+details.filter-section > summary.section-title {
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+details.filter-section > summary.section-title::-webkit-details-marker {
+  display: none;
+}
+
+details.filter-section > summary.section-title::before {
+  content: "\25B8";
+  display: inline-block;
+  width: 0.8em;
+  margin-right: 0.3em;
+  transition: transform 0.12s ease;
+}
+
+details.filter-section[open] > summary.section-title::before {
+  transform: rotate(90deg);
+}
+
+details.filter-section > summary.section-title:hover {
+  color: var(--text);
+}
+
 .filter-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
@@ -411,7 +437,7 @@ tbody tr:hover { background: var(--row-hover); }
 
 /* ---------- Detail modal ---------- */
 
-#modal-overlay, #sql-modal-overlay, #fuzzy-modal-overlay {
+#modal-overlay, #sql-modal-overlay, #fuzzy-modal-overlay, #confirm-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(15, 17, 21, 0.5);
@@ -421,9 +447,10 @@ tbody tr:hover { background: var(--row-hover); }
   justify-content: center;
   padding: 3rem 1rem;
   overflow-y: auto;
+  z-index: 50;
 }
 
-#modal-overlay.hidden, #sql-modal-overlay.hidden, #fuzzy-modal-overlay.hidden {
+#modal-overlay.hidden, #sql-modal-overlay.hidden, #fuzzy-modal-overlay.hidden, #confirm-modal-overlay.hidden {
   display: none;
 }
 
@@ -498,6 +525,30 @@ tbody tr:hover { background: var(--row-hover); }
 #sql-modal h2, #fuzzy-modal h2 {
   margin-top: 0;
   font-size: 1.1rem;
+}
+
+#confirm-modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 1.5rem 1.75rem;
+  max-width: 420px;
+  width: 100%;
+}
+
+#confirm-modal-message {
+  margin: 0 0 1.2rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+#confirm-modal .actions {
+  margin-top: 0;
+}
+
+#confirm-modal-cancel-btn.hidden {
+  display: none;
 }
 
 #sql-preview {

@@ -185,6 +185,25 @@ def build_filter_clauses(args):
         where_clauses.append("EXISTS (SELECT 1 FROM UNNEST(phases) AS p WHERE p IN UNNEST(@phases))")
         params.append(bigquery.ArrayQueryParameter("phases", "STRING", phases))
 
+    age_raw = args.get("age", "").strip()
+    if age_raw:
+        try:
+            age_years = float(age_raw)
+        except ValueError:
+            raise QueryBuildError("age must be a number")
+        if age_years < 0 or age_years > 130:
+            raise QueryBuildError("age must be between 0 and 130")
+        age_days = round(age_years * 365)
+        # minimum/maximum_age_days is NULL (not stated) or -1 (unparseable
+        # source string) when the trial's eligibility page didn't give a
+        # usable bound -- treat both as "no restriction" rather than
+        # excluding the trial.
+        where_clauses.append(
+            "(minimum_age_days IS NULL OR minimum_age_days < 0 OR minimum_age_days <= @age_days) "
+            "AND (maximum_age_days IS NULL OR maximum_age_days < 0 OR maximum_age_days >= @age_days)"
+        )
+        params.append(bigquery.ScalarQueryParameter("age_days", "INT64", age_days))
+
     healthy_volunteers = parse_bool_flag(args.get("healthy_volunteers"))
     if healthy_volunteers is not None:
         where_clauses.append("healthy_volunteers = @healthy_volunteers")

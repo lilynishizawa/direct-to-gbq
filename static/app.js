@@ -37,6 +37,7 @@ let state = {
   fuzzyCandidates: null,
   fuzzyResults: {},
   fuzzyPromptNctIds: [],
+  resultsReminderTimer: null,
 };
 
 const LABEL_OVERRIDES = {
@@ -125,6 +126,8 @@ function buildParams(page) {
   if (keyword) params.set("keyword", keyword);
   if (condition) params.set("condition", condition);
   if (sponsor) params.set("sponsor", sponsor);
+  const age = document.getElementById("age").value.trim();
+  if (age) params.set("age", age);
 
   for (const id of ["status", "study_type", "phase", "sponsor_class", "sex"]) {
     for (const v of selectedValues(id)) params.append(id, v);
@@ -319,10 +322,14 @@ function goToPage(page) {
 
 // ---------- Fuzzy match ----------
 
+// Age and sex are now hard search filters (see buildParams / the "Sex"
+// facet) rather than separate patient-panel inputs -- the patient profile
+// pulls them from there instead of asking for them twice.
 function getPatientProfile() {
+  const sexValues = selectedValues("sex").filter((v) => v === "MALE" || v === "FEMALE");
   return {
-    age: document.getElementById("patient-age").value,
-    sex: document.getElementById("patient-sex").value,
+    age: document.getElementById("age").value,
+    sex: sexValues.length === 1 ? sexValues[0] : "",
     notes: document.getElementById("patient-notes").value.trim(),
   };
 }
@@ -381,6 +388,41 @@ async function refreshFuzzyCandidates() {
   }
 }
 
+// ---------- Generic Yes/Cancel confirm modal ----------
+
+let activeConfirmCancel = null;
+
+// okOnly renders a single acknowledgement button (no real choice to make --
+// used for the empty-notes heads-up, which isn't a gate, just a notice).
+function showConfirm(message, { okOnly = false } = {}) {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById("confirm-modal-overlay");
+    const yesBtn = document.getElementById("confirm-modal-yes-btn");
+    const cancelBtn = document.getElementById("confirm-modal-cancel-btn");
+    document.getElementById("confirm-modal-message").textContent = message;
+    yesBtn.textContent = okOnly ? "OK" : "Yes";
+    cancelBtn.classList.toggle("hidden", okOnly);
+
+    function cleanup(result) {
+      overlay.classList.add("hidden");
+      yesBtn.removeEventListener("click", onYes);
+      cancelBtn.removeEventListener("click", onCancel);
+      overlay.removeEventListener("click", onOverlay);
+      activeConfirmCancel = null;
+      resolve(result);
+    }
+    function onYes() { cleanup(true); }
+    function onCancel() { cleanup(false); }
+    function onOverlay(e) { if (e.target.id === "confirm-modal-overlay") cleanup(okOnly); }
+
+    yesBtn.addEventListener("click", onYes);
+    cancelBtn.addEventListener("click", onCancel);
+    overlay.addEventListener("click", onOverlay);
+    activeConfirmCancel = okOnly ? onYes : onCancel;
+    overlay.classList.remove("hidden");
+  });
+}
+
 function showFuzzyModal() {
   document.getElementById("fuzzy-modal-overlay").classList.remove("hidden");
 }
@@ -390,13 +432,48 @@ function hideFuzzyModal() {
   document.getElementById("fuzzy-modal-run-btn").dataset.armed = "false";
 }
 
+async function fetchFuzzyPromptAndCost(patient, nctIds) {
+  const resp = await fetch("/api/fuzzy-match/prompt", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ patient, nct_ids: nctIds }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(data.error || resp.statusText);
+  return data;
+}
+
+function displayFuzzyPromptModal(data, nctIds) {
+  const errorBox = document.getElementById("fuzzy-modal-error");
+  errorBox.classList.add("hidden");
+  errorBox.textContent = "";
+  document.getElementById("fuzzy-prompt-preview").value = data.prompt;
+  const costEl = document.getElementById("fuzzy-cost-estimate");
+  if (data.cost) {
+    const c = data.cost;
+    costEl.textContent =
+      `This will cost up to $${c.max_total_cost.toFixed(2)} ` +
+      `($${c.input_cost.toFixed(4)} input for ${c.input_tokens.toLocaleString()} tokens + ` +
+      `up to $${c.max_output_cost.toFixed(2)} output). Actual cost is usually well below the max.`;
+  } else {
+    costEl.textContent = "Cost estimate unavailable.";
+  }
+  state.fuzzyPromptNctIds = nctIds;
+  document.getElementById("fuzzy-modal-run-btn").dataset.armed = "true";
+  showFuzzyModal();
+}
+
+// The manual "Run AI match" button -- fetches the prompt + cost and shows
+// the review modal, which is where the cost estimate actually gets shown.
 async function openFuzzyPromptModal() {
   if (!state.fuzzyCandidates || !state.fuzzyCandidates.trials || !state.fuzzyCandidates.trials.length) return;
   const patient = getPatientProfile();
   if (!patientProfileValid(patient)) {
-    document.getElementById("fuzzy-status").textContent = "Enter the patient's age and sex above before running the AI match.";
+    document.getElementById("fuzzy-status").textContent =
+      "Select the patient's sex and enter their age in the search filters above before running the AI match.";
     return;
   }
+
   const nctIds = state.fuzzyCandidates.trials.map((t) => t.nct_id);
   const textarea = document.getElementById("fuzzy-prompt-preview");
   const costEl = document.getElementById("fuzzy-cost-estimate");
@@ -409,35 +486,24 @@ async function openFuzzyPromptModal() {
   showFuzzyModal();
 
   try {
-    const resp = await fetch("/api/fuzzy-match/prompt", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ patient, nct_ids: nctIds }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) {
-      textarea.value = "";
-      errorBox.textContent = data.error || resp.statusText;
-      errorBox.classList.remove("hidden");
-      return;
-    }
-    textarea.value = data.prompt;
-    if (data.cost) {
-      const c = data.cost;
-      costEl.textContent =
-        `This fuzzy match will cost up to $${c.max_total_cost.toFixed(2)} ` +
-        `($${c.input_cost.toFixed(4)} input for ${c.input_tokens.toLocaleString()} tokens + ` +
-        `up to $${c.max_output_cost.toFixed(2)} output). Actual cost is usually well below the max.`;
-    } else {
-      costEl.textContent = "Cost estimate unavailable.";
-    }
-    state.fuzzyPromptNctIds = nctIds;
-    document.getElementById("fuzzy-modal-run-btn").dataset.armed = "true";
+    const data = await fetchFuzzyPromptAndCost(patient, nctIds);
+    displayFuzzyPromptModal(data, nctIds);
   } catch (err) {
     textarea.value = "";
-    errorBox.textContent = String(err);
+    errorBox.textContent = String(err.message || err);
     errorBox.classList.remove("hidden");
   }
+}
+
+// The one automatic popup: 2 seconds after hard search results land, remind
+// the user how to get AI filtering, rather than gating/chaining any further
+// confirms on top of it.
+function scheduleResultsReminder() {
+  if (state.resultsReminderTimer) clearTimeout(state.resultsReminderTimer);
+  state.resultsReminderTimer = setTimeout(() => {
+    state.resultsReminderTimer = null;
+    showConfirm("Fill out patient profile for further filtering and then click 'Run AI Match'.", { okOnly: true });
+  }, 2000);
 }
 
 function applyFuzzyResults(results) {
@@ -569,16 +635,19 @@ async function openDetail(nctId) {
       return;
     }
 
+    // fieldBlock() escapes its value and field-value has white-space:
+    // pre-wrap, so a plain newline renders as a real line break -- an
+    // embedded "<br>" would just show up as literal escaped text.
     const interventions = (t.interventions || [])
-      .map((i) => `${escapeHtml(i.type)}: ${escapeHtml(i.name)}`)
-      .join("<br>");
+      .map((i) => `${i.type}: ${i.name}`)
+      .join("\n");
     const locations = (t.locations || [])
       .slice(0, 15)
-      .map((l) => `${escapeHtml(l.facility)} — ${escapeHtml(l.city)}, ${escapeHtml(l.state)}, ${escapeHtml(l.country)} (${escapeHtml(l.status)})`)
-      .join("<br>");
+      .map((l) => `${l.facility} — ${l.city}, ${l.state}, ${l.country} (${l.status})`)
+      .join("\n");
     const secondaryOutcomes = (t.secondary_outcomes || [])
-      .map((o) => `${escapeHtml(o.measure)} — ${escapeHtml(o.time_frame)}`)
-      .join("<br>");
+      .map((o) => `${o.measure} — ${o.time_frame}`)
+      .join("\n");
 
     body.innerHTML = `
       <h2>${escapeHtml(t.brief_title)}</h2>
@@ -640,6 +709,10 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.getElementById("resetBtn").addEventListener("click", () => {
+    if (state.resultsReminderTimer) {
+      clearTimeout(state.resultsReminderTimer);
+      state.resultsReminderTimer = null;
+    }
     document.getElementById("filters").reset();
     for (const id of ["status", "study_type", "phase", "sponsor_class", "sex"]) {
       clearFacetGroup(id);
@@ -685,6 +758,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (ok) {
         state.approvedSignature = filterSignature();
         refreshFuzzyCandidates();
+        scheduleResultsReminder();
       }
     } else {
       ok = await runCustomQuery(currentSql);
@@ -726,6 +800,7 @@ document.addEventListener("DOMContentLoaded", () => {
       closeSqlModal();
       hideFuzzyModal();
       closeAllDropdowns();
+      if (activeConfirmCancel) activeConfirmCancel();
     }
   });
 });
