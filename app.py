@@ -32,6 +32,10 @@ MAX_CUSTOM_SQL_ROWS = 500
 
 FUZZY_MATCH_MODEL = "claude-opus-4-8"
 FUZZY_MATCH_MAX_TRIALS = 100
+FUZZY_MATCH_MAX_TOKENS = 32000
+# claude-opus-4-8 pricing, per million tokens.
+FUZZY_MATCH_INPUT_PRICE_PER_MTOK = 5.00
+FUZZY_MATCH_OUTPUT_PRICE_PER_MTOK = 25.00
 
 FORBIDDEN_SQL_KEYWORDS = re.compile(
     r"\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|MERGE|TRUNCATE|GRANT|REVOKE|CALL|EXPORT|LOAD)\b",
@@ -451,6 +455,32 @@ def build_fuzzy_result_schema(nct_ids):
     }
 
 
+def estimate_fuzzy_match_cost(prompt):
+    """Estimates the cost of running the fuzzy match prompt. Input cost is
+    exact (via the token-counting endpoint); output cost can only be bounded
+    by the max_tokens ceiling since actual output length depends on how much
+    the model reasons and writes. Returns None if the estimate call fails --
+    the prompt preview should still work even if this does not."""
+    try:
+        ai_client = anthropic.Anthropic()
+        count = ai_client.messages.count_tokens(
+            model=FUZZY_MATCH_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        input_tokens = count.input_tokens
+    except Exception:
+        return None
+
+    input_cost = input_tokens * FUZZY_MATCH_INPUT_PRICE_PER_MTOK / 1_000_000
+    max_output_cost = FUZZY_MATCH_MAX_TOKENS * FUZZY_MATCH_OUTPUT_PRICE_PER_MTOK / 1_000_000
+    return {
+        "input_tokens": input_tokens,
+        "input_cost": input_cost,
+        "max_output_cost": max_output_cost,
+        "max_total_cost": input_cost + max_output_cost,
+    }
+
+
 @app.route("/api/fuzzy-match/candidates")
 def api_fuzzy_match_candidates():
     """The current search filters *are* the hard criteria -- whatever the
@@ -507,7 +537,9 @@ def api_fuzzy_match_prompt():
         trials = fetch_trials_by_ids(nct_ids)
     except Exception as e:
         return jsonify({"error": str(e)}), 400
-    return jsonify({"prompt": build_fuzzy_prompt(patient, trials)})
+
+    prompt = build_fuzzy_prompt(patient, trials)
+    return jsonify({"prompt": prompt, "cost": estimate_fuzzy_match_cost(prompt)})
 
 
 @app.route("/api/fuzzy-match/run", methods=["POST"])
@@ -539,7 +571,7 @@ def api_fuzzy_match_run():
         ai_client = anthropic.Anthropic()
         with ai_client.messages.stream(
             model=FUZZY_MATCH_MODEL,
-            max_tokens=32000,
+            max_tokens=FUZZY_MATCH_MAX_TOKENS,
             thinking={"type": "adaptive"},
             output_config={"effort": "high", "format": {"type": "json_schema", "schema": schema}},
             messages=[{"role": "user", "content": prompt}],

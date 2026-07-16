@@ -399,10 +399,12 @@ async function openFuzzyPromptModal() {
   }
   const nctIds = state.fuzzyCandidates.trials.map((t) => t.nct_id);
   const textarea = document.getElementById("fuzzy-prompt-preview");
+  const costEl = document.getElementById("fuzzy-cost-estimate");
   const errorBox = document.getElementById("fuzzy-modal-error");
   errorBox.classList.add("hidden");
   errorBox.textContent = "";
   textarea.value = "Building prompt...";
+  costEl.textContent = "";
   document.getElementById("fuzzy-modal-run-btn").dataset.armed = "false";
   showFuzzyModal();
 
@@ -420,6 +422,15 @@ async function openFuzzyPromptModal() {
       return;
     }
     textarea.value = data.prompt;
+    if (data.cost) {
+      const c = data.cost;
+      costEl.textContent =
+        `This fuzzy match will cost up to $${c.max_total_cost.toFixed(2)} ` +
+        `($${c.input_cost.toFixed(4)} input for ${c.input_tokens.toLocaleString()} tokens + ` +
+        `up to $${c.max_output_cost.toFixed(2)} output). Actual cost is usually well below the max.`;
+    } else {
+      costEl.textContent = "Cost estimate unavailable.";
+    }
     state.fuzzyPromptNctIds = nctIds;
     document.getElementById("fuzzy-modal-run-btn").dataset.armed = "true";
   } catch (err) {
