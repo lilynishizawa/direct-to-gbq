@@ -593,11 +593,11 @@ tbody tr:hover { background: var(--row-hover); }
   font-family: inherit;
 }
 
-/* ---------- Fuzzy match panel ---------- */
-
-.fuzzy-card {
-  margin-top: 1.25rem;
+.fuzzy-run-note {
+  margin-top: 0.9rem;
 }
+
+/* ---------- Fuzzy match panel ---------- */
 
 .fuzzy-status {
   margin: 0 0 1rem;
@@ -619,35 +619,14 @@ tbody tr:hover { background: var(--row-hover); }
   display: none;
 }
 
-#fuzzy-results.hidden {
-  display: none;
-}
-
-.fuzzy-counts {
-  margin: 1.1rem 0 0.75rem;
+.results-eligibility-summary {
+  margin: 0 0 0.75rem;
   font-weight: 600;
   font-size: 0.9rem;
 }
 
-#fuzzy-table {
-  border-collapse: collapse;
-  width: 100%;
-  font-size: 0.85rem;
-}
-
-#fuzzy-table th, #fuzzy-table td {
-  padding: 0.55rem 0.7rem;
-  text-align: left;
-  border-bottom: 1px solid var(--border);
-}
-
-#fuzzy-table tbody tr {
-  cursor: pointer;
-  transition: background 0.1s ease;
-}
-
-#fuzzy-table tbody tr:hover {
-  background: var(--row-hover);
+.results-eligibility-summary.hidden {
+  display: none;
 }
 
 .fuzzy-badge-eligible {

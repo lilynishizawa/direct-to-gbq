@@ -187,9 +187,17 @@
         <span class="filter-label">Additional clinical information</span>
         <textarea id="patient-notes" rows="4" placeholder="Diagnoses, medications, prior treatments, biomarkers, etc. -- anything relevant to eligibility"></textarea>
       </label>
+      <p class="subtitle fuzzy-run-note">Your search results are the hard criteria -- whatever trials your filters return are the candidate pool the AI reasons over.</p>
+      <p id="fuzzy-status" class="fuzzy-status">Run a search to see how many trials qualify for AI matching.</p>
+      <div class="actions">
+        <button type="button" id="fuzzy-run-btn" disabled>Run AI match</button>
+      </div>
+      <div id="fuzzy-warning" class="fuzzy-warning hidden"></div>
     </section>
 
     <section id="status-bar"></section>
+
+    <div id="results-eligibility-summary" class="results-eligibility-summary hidden"></div>
 
     <section id="results">
       <table id="results-table">
@@ -220,24 +228,6 @@
       <span id="pageInfo"></span>
       <button type="button" id="nextPage" class="btn-ghost" disabled>Next &raquo;</button>
     </div>
-
-    <section id="fuzzy-panel" class="filter-card fuzzy-card">
-      <h2 class="section-title">Fuzzy Match</h2>
-      <p class="subtitle">Your search results above are the hard criteria -- whatever trials your filters return are the candidate pool the AI reasons over.</p>
-      <p id="fuzzy-status" class="fuzzy-status">Run a search to see how many trials qualify for AI matching.</p>
-      <div class="actions">
-        <button type="button" id="fuzzy-run-btn" disabled>Run AI match</button>
-      </div>
-      <div id="fuzzy-warning" class="fuzzy-warning hidden"></div>
-
-      <div id="fuzzy-results" class="hidden">
-        <div id="fuzzy-counts" class="fuzzy-counts"></div>
-        <table id="fuzzy-table">
-          <thead><tr><th>NCT ID</th><th>Title</th><th>Overall eligibility</th></tr></thead>
-          <tbody id="fuzzy-body"></tbody>
-        </table>
-      </div>
-    </section>
   </main>
 
   <div id="modal-overlay" class="hidden">

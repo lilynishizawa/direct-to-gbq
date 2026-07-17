@@ -27,6 +27,20 @@ const SEARCH_COLUMNS = [
   { key: "has_results", label: "Has results", format: (v) => (v ? "Yes" : "No") },
 ];
 
+// Prepended to SEARCH_COLUMNS once AI results exist, so eligibility shows
+// as the leftmost column of the existing results table instead of a
+// separate table.
+const ELIGIBILITY_COLUMN = {
+  key: "eligibility",
+  label: "Eligibility",
+  raw: true,
+  format: (v) => {
+    if (!v) return "";
+    const badgeClass = `fuzzy-badge-${(v.overall || "").toLowerCase()}`;
+    return `<span class="badge ${badgeClass}">${escapeHtml(v.overall)}</span>`;
+  },
+};
+
 let state = {
   page: 1,
   pageSize: 25,
@@ -34,6 +48,7 @@ let state = {
   originalSql: "",
   customMode: false,
   lastError: "",
+  lastSearchRows: [],
   fuzzyCandidates: null,
   fuzzyResults: {},
   fuzzyPromptNctIds: [],
@@ -202,6 +217,19 @@ function renderTable(columns, rows, onRowClick) {
   }
 }
 
+// Wraps renderTable() for the main search results specifically: prepends
+// the Eligibility column (and merges each row's AI result onto it) once AI
+// matching has produced results for the current search, so eligibility
+// shows inline instead of in a separate table.
+function renderResultsTable(rows) {
+  const hasFuzzy = Object.keys(state.fuzzyResults).length > 0;
+  const columns = hasFuzzy ? [ELIGIBILITY_COLUMN, ...SEARCH_COLUMNS] : SEARCH_COLUMNS;
+  const renderRows = hasFuzzy
+    ? rows.map((r) => ({ ...r, eligibility: state.fuzzyResults[r.nct_id] }))
+    : rows;
+  renderTable(columns, renderRows, (row) => openDetail(row.nct_id));
+}
+
 async function runSearch(page) {
   state.page = page;
   state.customMode = false;
@@ -218,7 +246,8 @@ async function runSearch(page) {
       document.getElementById("results-body").innerHTML = "";
       return false;
     }
-    renderTable(SEARCH_COLUMNS, data.rows, (row) => openDetail(row.nct_id));
+    state.lastSearchRows = data.rows;
+    renderResultsTable(data.rows);
     const totalPages = Math.max(Math.ceil(data.total / data.page_size), 1);
     document.getElementById("pageInfo").textContent =
       `Page ${data.page} of ${totalPages} (${data.total.toLocaleString()} results)`;
@@ -340,10 +369,11 @@ function patientProfileValid(patient) {
 
 function resetFuzzyPanel(message) {
   state.fuzzyCandidates = null;
+  state.fuzzyResults = {};
   document.getElementById("fuzzy-status").textContent = message;
   document.getElementById("fuzzy-warning").classList.add("hidden");
-  document.getElementById("fuzzy-results").classList.add("hidden");
   document.getElementById("fuzzy-run-btn").disabled = true;
+  document.getElementById("results-eligibility-summary").classList.add("hidden");
 }
 
 // The main search's filters ARE the hard criteria -- whatever trials the
@@ -355,9 +385,15 @@ async function refreshFuzzyCandidates() {
   const warningEl = document.getElementById("fuzzy-warning");
   const runBtn = document.getElementById("fuzzy-run-btn");
   warningEl.classList.add("hidden");
-  document.getElementById("fuzzy-results").classList.add("hidden");
   state.fuzzyCandidates = null;
   runBtn.disabled = true;
+
+  // A fresh hard search invalidates any previous AI assessment -- the
+  // candidate pool (and possibly the patient profile) may have changed.
+  state.fuzzyResults = {};
+  document.getElementById("results-eligibility-summary").classList.add("hidden");
+  renderResultsTable(state.lastSearchRows);
+
   statusEl.textContent = "Checking how many searched trials qualify for AI matching...";
 
   const params = buildParams(1);
@@ -506,37 +542,22 @@ function scheduleResultsReminder() {
   }, 2000);
 }
 
+// Eligibility results land inline as the leftmost column of the existing
+// results table (see renderResultsTable), plus a counts header above it --
+// no separate results table.
 function applyFuzzyResults(results) {
-  const titleById = {};
-  for (const t of state.fuzzyCandidates.trials) titleById[t.nct_id] = t.brief_title;
-
   state.fuzzyResults = {};
   for (const r of results) state.fuzzyResults[r.nct_id] = r;
-
-  const rank = { Eligible: 0, Ineligible: 1, Uncertain: 2 };
-  const sorted = [...results].sort((a, b) => (rank[a.overall] ?? 3) - (rank[b.overall] ?? 3));
 
   const counts = { Eligible: 0, Uncertain: 0, Ineligible: 0 };
   for (const r of results) {
     if (counts[r.overall] !== undefined) counts[r.overall]++;
   }
-  document.getElementById("fuzzy-counts").textContent =
-    `${counts.Eligible} Eligible, ${counts.Uncertain} Uncertain, ${counts.Ineligible} Ineligible`;
+  const summaryEl = document.getElementById("results-eligibility-summary");
+  summaryEl.textContent = `${counts.Eligible} Eligible, ${counts.Uncertain} Uncertain, ${counts.Ineligible} Ineligible`;
+  summaryEl.classList.remove("hidden");
 
-  const body = document.getElementById("fuzzy-body");
-  body.innerHTML = "";
-  for (const r of sorted) {
-    const tr = document.createElement("tr");
-    const badgeClass = `fuzzy-badge-${(r.overall || "").toLowerCase()}`;
-    tr.innerHTML =
-      `<td>${escapeHtml(r.nct_id)}</td>` +
-      `<td>${escapeHtml(titleById[r.nct_id] || "")}</td>` +
-      `<td><span class="badge ${badgeClass}">${escapeHtml(r.overall)}</span></td>`;
-    tr.style.cursor = "pointer";
-    tr.addEventListener("click", () => openDetail(r.nct_id));
-    body.appendChild(tr);
-  }
-  document.getElementById("fuzzy-results").classList.remove("hidden");
+  renderResultsTable(state.lastSearchRows);
 }
 
 async function runFuzzyMatchAi() {
@@ -727,8 +748,8 @@ document.addEventListener("DOMContentLoaded", () => {
     state.approvedSignature = null;
     state.customMode = false;
     state.originalSql = "";
+    state.lastSearchRows = [];
 
-    state.fuzzyResults = {};
     resetFuzzyPanel("Run a search to see how many trials qualify for AI matching.");
   });
 
