@@ -41,6 +41,10 @@ const ELIGIBILITY_COLUMN = {
   },
 };
 
+// Sort order once AI eligibility results exist: Eligible first, then
+// Uncertain, then Ineligible, with any unmatched rows (no AI result) last.
+const ELIGIBILITY_RANK = { Eligible: 0, Uncertain: 1, Ineligible: 2 };
+
 let state = {
   page: 1,
   pageSize: 25,
@@ -557,6 +561,12 @@ function applyFuzzyResults(results) {
   summaryEl.textContent = `${counts.Eligible} Eligible, ${counts.Uncertain} Uncertain, ${counts.Ineligible} Ineligible`;
   summaryEl.classList.remove("hidden");
 
+  state.lastSearchRows = [...state.lastSearchRows].sort((a, b) => {
+    const rankA = ELIGIBILITY_RANK[state.fuzzyResults[a.nct_id]?.overall] ?? 3;
+    const rankB = ELIGIBILITY_RANK[state.fuzzyResults[b.nct_id]?.overall] ?? 3;
+    return rankA - rankB;
+  });
+
   renderResultsTable(state.lastSearchRows);
 }
 
@@ -620,15 +630,15 @@ function renderFuzzyDetail(nctId) {
       <div class="field-value"><span class="badge fuzzy-badge-${(r.overall || "").toLowerCase()}">${escapeHtml(r.overall)}</span></div>
     </div>
     <div class="field">
-      <div class="field-label">Criteria that make patient ineligible</div>
+      <div class="field-label">Why they may not qualify</div>
       ${list(r.ineligible_criteria)}
     </div>
     <div class="field">
-      <div class="field-label">Uncertain criteria</div>
+      <div class="field-label">Needs more information</div>
       ${list(r.uncertain_criteria)}
     </div>
     <div class="field">
-      <div class="field-label">Criteria that make patient eligible</div>
+      <div class="field-label">Why they may qualify</div>
       ${list(r.eligible_criteria)}
     </div>
   `;
