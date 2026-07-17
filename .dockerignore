@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.git/
+.vscode/
+.claude/
+ctgov_to_bigquery.py
+probe_20_trials.py
+probe_query_mismatch.py
+queries.sql
+to_do.txt

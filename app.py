@@ -3,7 +3,7 @@ Local web front-end for querying the ClinicalTrials.gov BigQuery table
 populated by ctgov_to_bigquery.py.
 
 Setup:
-    pip install flask google-cloud-bigquery anthropic
+    pip install -r requirements.txt
 
 Auth: same as ctgov_to_bigquery.py (ADC or GOOGLE_APPLICATION_CREDENTIALS).
 Fuzzy match also calls the Claude API (ANTHROPIC_API_KEY or `ant auth login`).
@@ -11,9 +11,13 @@ Fuzzy match also calls the Claude API (ANTHROPIC_API_KEY or `ant auth login`).
 Usage:
     python app.py
     -> open http://127.0.0.1:5000
+
+    Set FLASK_DEBUG=1 to run with the Flask debugger/reloader for local dev.
+    In production this app is served by gunicorn instead (see Dockerfile).
 """
 
 import json
+import os
 import re
 from datetime import datetime, date
 
@@ -620,4 +624,7 @@ def api_fuzzy_match_run():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # In production this file is served by gunicorn (see Dockerfile), not this
+    # block. This is only for local development: `python app.py`.
+    debug = os.environ.get("FLASK_DEBUG") == "1"
+    app.run(host="127.0.0.1" if debug else "0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=debug)
