@@ -61,6 +61,21 @@ app = Flask(__name__)
 client = bigquery.Client(project=PROJECT_ID)
 
 
+@app.context_processor
+def inject_asset_version():
+    # Appended as a ?v= query string on static asset URLs so browsers fetch
+    # a fresh copy whenever the file changes, instead of serving a stale
+    # cached one indefinitely.
+    def asset_version(filename):
+        path = os.path.join(app.static_folder, filename)
+        try:
+            return int(os.path.getmtime(path))
+        except OSError:
+            return 0
+
+    return {"asset_version": asset_version}
+
+
 def json_safe(value):
     if isinstance(value, (datetime, date)):
         return value.isoformat()

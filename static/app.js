@@ -549,7 +549,7 @@ function scheduleResultsReminder() {
 // Eligibility results land inline as the leftmost column of the existing
 // results table (see renderResultsTable), plus a counts header above it --
 // no separate results table.
-function applyFuzzyResults(results) {
+async function applyFuzzyResults(results) {
   state.fuzzyResults = {};
   for (const r of results) state.fuzzyResults[r.nct_id] = r;
 
@@ -561,11 +561,20 @@ function applyFuzzyResults(results) {
   summaryEl.textContent = `${counts.Eligible} Eligible, ${counts.Uncertain} Uncertain, ${counts.Ineligible} Ineligible`;
   summaryEl.classList.remove("hidden");
 
+  const describeOrder = () =>
+    state.lastSearchRows
+      .map((r) => `${r.nct_id} (${state.fuzzyResults[r.nct_id]?.overall ?? "n/a"})`)
+      .join("\n");
+
+  await showConfirm(`[DEBUG] About to sort. Current order:\n${describeOrder()}`, { okOnly: true });
+
   state.lastSearchRows = [...state.lastSearchRows].sort((a, b) => {
     const rankA = ELIGIBILITY_RANK[state.fuzzyResults[a.nct_id]?.overall] ?? 3;
     const rankB = ELIGIBILITY_RANK[state.fuzzyResults[b.nct_id]?.overall] ?? 3;
     return rankA - rankB;
   });
+
+  await showConfirm(`[DEBUG] Sort complete. New order:\n${describeOrder()}`, { okOnly: true });
 
   renderResultsTable(state.lastSearchRows);
 }
@@ -593,7 +602,7 @@ async function runFuzzyMatchAi() {
       errorBox.classList.remove("hidden");
       return;
     }
-    applyFuzzyResults(data.results);
+    await applyFuzzyResults(data.results);
     hideFuzzyModal();
   } catch (err) {
     errorBox.textContent = String(err);

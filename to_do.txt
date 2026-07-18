@@ -14,3 +14,5 @@ If optional info is empty, then prompt for it "Please enter if you want AI to fi
 Once results come up, pop up where "Run with AI? Approx cost: __" with Yes or Cancel option
 MeSH filtering
 AI filtered eligibility should show up on the left side of the original results instead of a new set of results being pasted at the bottom. Add header above results. 
+
+Sort results by eligibility
