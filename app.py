@@ -25,6 +25,8 @@ import anthropic
 from flask import Flask, render_template, request, jsonify
 from google.cloud import bigquery
 
+import condition_synonyms
+
 PROJECT_ID = "lily123"
 DATASET_ID = "directdata"
 TABLE_ID = "directtable"
@@ -157,16 +159,22 @@ def build_filter_clauses(args):
 
     condition = args.get("condition", "").strip()
     if condition:
+        # Expand to the typed text plus its MeSH synonyms (e.g. "heart attack"
+        # -> also "Myocardial Infarction") so a trial tagged only with the
+        # clinical name still matches a colloquial search, matching how
+        # clinicaltrials.gov's own condition search behaves.
+        condition_terms = condition_synonyms.expand(condition)
+        like_patterns = [f"%{t.lower()}%" for t in condition_terms]
         where_clauses.append(
-            "(EXISTS (SELECT 1 FROM UNNEST(conditions) AS c WHERE LOWER(c) LIKE @condition) "
-            "OR EXISTS (SELECT 1 FROM UNNEST(keywords) AS k WHERE LOWER(k) LIKE @condition) "
+            "(EXISTS (SELECT 1 FROM UNNEST(conditions) AS c, UNNEST(@condition_terms) AS t WHERE LOWER(c) LIKE t) "
+            "OR EXISTS (SELECT 1 FROM UNNEST(keywords) AS k, UNNEST(@condition_terms) AS t WHERE LOWER(k) LIKE t) "
             # mesh_terms is clinicaltrials.gov's own MeSH tagging for the trial,
             # which sometimes uses different wording than the trial's own
             # conditions/keywords text (e.g. "Diabetes Mellitus, Type 2" vs a
             # trial that only wrote "Type 2 Diabetes" in `conditions`).
-            "OR EXISTS (SELECT 1 FROM UNNEST(mesh_terms) AS m WHERE LOWER(m) LIKE @condition))"
+            "OR EXISTS (SELECT 1 FROM UNNEST(mesh_terms) AS m, UNNEST(@condition_terms) AS t WHERE LOWER(m) LIKE t))"
         )
-        params.append(bigquery.ScalarQueryParameter("condition", "STRING", f"%{condition.lower()}%"))
+        params.append(bigquery.ArrayQueryParameter("condition_terms", "STRING", like_patterns))
 
     sponsor = args.get("sponsor", "").strip()
     if sponsor:
