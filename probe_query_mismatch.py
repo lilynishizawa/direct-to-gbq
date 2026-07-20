@@ -63,8 +63,8 @@ class ArgsShim:
 
 def build_local_match_query(condition, statuses, sexes, phases):
     """Reuses app.py's own WHERE-clause logic (condition/status/sex/phase
-    only) but drops the LIMIT/OFFSET and adds `keywords` to the SELECT list,
-    so we get every matching row instead of one page."""
+    only) but drops the LIMIT/OFFSET and adds `keywords`/`mesh_terms` to the
+    SELECT list, so we get every matching row instead of one page."""
     args = ArgsShim({
         "condition": [condition] if condition else [],
         "status": statuses,
@@ -75,7 +75,7 @@ def build_local_match_query(condition, statuses, sexes, phases):
 
     params = params[:-2]  # drop the page_size/offset params build_search_query appends last
     query = query.replace(", COUNT(*) OVER() AS total_count", "")
-    query = query.replace(webapp.LIST_COLUMNS, webapp.LIST_COLUMNS + ", keywords", 1)
+    query = query.replace(webapp.LIST_COLUMNS, webapp.LIST_COLUMNS + ", keywords, mesh_terms", 1)
     query = re.sub(r"LIMIT @page_size OFFSET @offset\s*$", "", query).strip()
 
     return query, params, display_sql
@@ -96,6 +96,7 @@ def fetch_local_matches(client, condition, statuses, sexes, phases):
             "phases": list(r["phases"] or []),
             "conditions": list(r["conditions"] or []),
             "keywords": list(r["keywords"] or []),
+            "mesh_terms": list(r["mesh_terms"] or []),
         }
     return by_id
 
@@ -106,7 +107,7 @@ def lookup_local_by_id(client, nct_ids):
     if not nct_ids:
         return {}
     query = f"""
-        SELECT nct_id, overall_status, sex, phases, conditions, keywords
+        SELECT nct_id, overall_status, sex, phases, conditions, keywords, mesh_terms
         FROM {webapp.TABLE_REF}
         WHERE nct_id IN UNNEST(@ids)
     """
@@ -121,6 +122,7 @@ def lookup_local_by_id(client, nct_ids):
             "phases": list(r["phases"] or []),
             "conditions": list(r["conditions"] or []),
             "keywords": list(r["keywords"] or []),
+            "mesh_terms": list(r["mesh_terms"] or []),
         }
         for r in rows
     }
@@ -242,10 +244,14 @@ def classify_missing(nct_id, live_fields, local_lookup, condition, statuses, sex
         )
     if condition:
         needle = condition.lower()
-        local_hit = any(needle in c.lower() for c in local["conditions"])
+        local_hit = (
+            any(needle in c.lower() for c in local["conditions"])
+            or any(needle in m.lower() for m in local["mesh_terms"])
+        )
         if not local_hit:
             return "CONDITION_TEXT_GAP", (
-                f"local conditions={local['conditions']!r} contain no literal "
+                f"local conditions={local['conditions']!r} and "
+                f"mesh_terms={local['mesh_terms']!r} contain no literal "
                 f"{condition!r}; live matched it via query.cond's synonym/keyword "
                 f"expansion (live conditions={live_fields['conditions']!r}, "
                 f"live keywords={live_fields['keywords']!r})"
