@@ -159,7 +159,12 @@ def build_filter_clauses(args):
     if condition:
         where_clauses.append(
             "(EXISTS (SELECT 1 FROM UNNEST(conditions) AS c WHERE LOWER(c) LIKE @condition) "
-            "OR EXISTS (SELECT 1 FROM UNNEST(keywords) AS k WHERE LOWER(k) LIKE @condition))"
+            "OR EXISTS (SELECT 1 FROM UNNEST(keywords) AS k WHERE LOWER(k) LIKE @condition) "
+            # mesh_terms is clinicaltrials.gov's own MeSH tagging for the trial,
+            # which sometimes uses different wording than the trial's own
+            # conditions/keywords text (e.g. "Diabetes Mellitus, Type 2" vs a
+            # trial that only wrote "Type 2 Diabetes" in `conditions`).
+            "OR EXISTS (SELECT 1 FROM UNNEST(mesh_terms) AS m WHERE LOWER(m) LIKE @condition))"
         )
         params.append(bigquery.ScalarQueryParameter("condition", "STRING", f"%{condition.lower()}%"))
 
