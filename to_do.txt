@@ -12,7 +12,12 @@ New fields or updated fields
     Include age in initial (hard) search options
 If optional info is empty, then prompt for it "Please enter if you want AI to filter for these results"
 Once results come up, pop up where "Run with AI? Approx cost: __" with Yes or Cancel option
+
 MeSH filtering
+    Need to get synonyms of a condition from somewhere
+    Ask claude to apply MeSH filtering to 'conditions'
+        Ask for steps
+
 AI filtered eligibility should show up on the left side of the original results instead of a new set of results being pasted at the bottom. Add header above results. 
 
 Sort results by eligibility
