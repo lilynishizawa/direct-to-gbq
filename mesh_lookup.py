@@ -219,6 +219,21 @@ def lookup_keyword(
     return {"keyword": keyword, "descriptors": descriptors}
 
 
+def flat_synonyms(result: dict[str, Any]) -> list[str]:
+    """Flatten a lookup_keyword() result into a deduped, search-ready list:
+    the original keyword, every matching descriptor's official heading,
+    every concept label, and every alternate name under them."""
+    terms = {result["keyword"]}
+    for d in result["descriptors"]:
+        if d["descriptor_label"]:
+            terms.add(d["descriptor_label"])
+        for c in d["concepts"]:
+            if c["concept_label"]:
+                terms.add(c["concept_label"])
+            terms.update(c["alternate_names"])
+    return sorted(t for t in terms if t)
+
+
 def print_human_readable(result: dict[str, Any]) -> None:
     keyword = result["keyword"]
     descriptors = result["descriptors"]
