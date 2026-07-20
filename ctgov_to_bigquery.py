@@ -55,6 +55,12 @@ TABLE_SCHEMA = [
     bigquery.SchemaField("lead_sponsor_class", "STRING"),
     bigquery.SchemaField("conditions", "STRING", mode="REPEATED"),
     bigquery.SchemaField("keywords", "STRING", mode="REPEATED"),
+    # clinicaltrials.gov's own MeSH tagging for this trial (derivedSection,
+    # not something the submitter typed) -- lets search match trials whose
+    # plain-language `conditions` text uses different wording than the
+    # official MeSH term clinicaltrials.gov assigned. See mesh_lookup.py for
+    # expanding a *search term* into synonyms; this is the trial-side half.
+    bigquery.SchemaField("mesh_terms", "STRING", mode="REPEATED"),
     bigquery.SchemaField("intervention_types", "STRING", mode="REPEATED"),
     bigquery.SchemaField("interventions", "RECORD", mode="REPEATED", fields=[
         bigquery.SchemaField("type", "STRING"),
@@ -228,6 +234,11 @@ def flatten(study, retrieved_at):
     enrollment_count = design.get("enrollmentInfo", {}).get("count")
     lead_sponsor = sponsor.get("leadSponsor", {})
 
+    condition_browse = study.get("derivedSection", {}).get("conditionBrowseModule", {})
+    mesh_terms = [
+        m.get("term") for m in condition_browse.get("meshes", []) if m.get("term")
+    ]
+
     interventions = arms_interventions.get("interventions", [])
     intervention_types = sorted({
         intervention["type"]
@@ -252,6 +263,7 @@ def flatten(study, retrieved_at):
         "lead_sponsor_class": lead_sponsor.get("class"),
         "conditions": conditions_mod.get("conditions", []),
         "keywords": conditions_mod.get("keywords", []),
+        "mesh_terms": mesh_terms,
         "intervention_types": intervention_types,
         "interventions": [
             {"type": i.get("type"), "name": i.get("name")}
