@@ -856,6 +856,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("patient-file-input").value = "";
     document.getElementById("upload-status").textContent = "";
     document.getElementById("upload-status").classList.remove("upload-error");
+    document.getElementById("patient-notes").value = "";
 
     resetFuzzyPanel("Run a search to see how many trials qualify for AI matching.");
   });
