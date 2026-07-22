@@ -16,16 +16,20 @@ Usage:
     In production this app is served by gunicorn instead (see Dockerfile).
 """
 
+import hmac
 import json
 import os
 import re
 from datetime import datetime, date
 
 import anthropic
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response
 from google.cloud import bigquery
 
 import condition_synonyms
+
+SITE_USERNAME = os.environ.get("SITE_USERNAME")
+SITE_PASSWORD = os.environ.get("SITE_PASSWORD")
 
 PROJECT_ID = "lily123"
 DATASET_ID = "directdata"
@@ -61,6 +65,23 @@ LIST_COLUMNS = """
 
 app = Flask(__name__)
 client = bigquery.Client(project=PROJECT_ID)
+
+
+@app.before_request
+def require_login():
+    if not SITE_USERNAME or not SITE_PASSWORD:
+        return  # no credentials configured (e.g. local dev) - skip the gate
+
+    auth = request.authorization
+    valid = (
+        auth
+        and hmac.compare_digest(auth.username, SITE_USERNAME)
+        and hmac.compare_digest(auth.password, SITE_PASSWORD)
+    )
+    if not valid:
+        return Response(
+            "Login required", 401, {"WWW-Authenticate": 'Basic realm="direct-to-gbq"'}
+        )
 
 
 @app.context_processor
