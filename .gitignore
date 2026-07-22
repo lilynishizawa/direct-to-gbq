@@ -1,5 +1,4 @@
 .vscode/settings.json
-__pycache__/app.cpython-312.pyc
-ctgov_to_bigquery.cpython-312.pyc
-probe_nct_existence.cpython-312.pyc
+__pycache__/
 to_do.txt
+mesh_synonym_cache.json
