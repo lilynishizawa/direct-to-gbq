@@ -183,10 +183,18 @@
     <section id="patient-panel" class="filter-card patient-card">
       <h2 class="section-title">Patient Profile (for fuzzy match)</h2>
       <p class="subtitle">Age and sex come from the search filters above. Anything else relevant to eligibility goes here.</p>
-      <label class="patient-notes-label">
-        <span class="filter-label">Additional clinical information</span>
-        <textarea id="patient-notes" rows="4" placeholder="Diagnoses, medications, prior treatments, biomarkers, etc. -- anything relevant to eligibility"></textarea>
-      </label>
+      <div class="patient-notes-row">
+        <label class="patient-notes-label">
+          <span class="filter-label">Additional clinical information</span>
+          <textarea id="patient-notes" rows="4" placeholder="Diagnoses, medications, prior treatments, biomarkers, etc. -- anything relevant to eligibility"></textarea>
+        </label>
+        <div class="upload-col">
+          <span class="filter-label">Upload patient file (optional)</span>
+          <input type="file" id="patient-file-input" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.txt">
+          <p class="subtitle">Claude will read it and pre-fill age, sex, and condition above, plus add relevant details to the notes box.</p>
+          <p id="upload-status" class="upload-status"></p>
+        </div>
+      </div>
       <p class="subtitle fuzzy-run-note">Your search results are the hard criteria -- whatever trials your filters return are the candidate pool the AI reasons over.</p>
       <p id="fuzzy-status" class="fuzzy-status">Run a search to see how many trials qualify for AI matching.</p>
       <div class="actions">
@@ -252,6 +260,18 @@
       <div class="actions">
         <button type="button" id="fuzzy-modal-run-btn">Run AI match</button>
         <button type="button" id="fuzzy-modal-cancel-btn" class="btn-ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="file-info-modal-overlay" class="hidden">
+    <div id="file-info-modal">
+      <h2>Review information from your uploaded file</h2>
+      <p class="subtitle">This is what will be used as the "Additional clinical information" for the AI eligibility check. Edit anything before continuing.</p>
+      <textarea id="file-info-preview" rows="10" spellcheck="false"></textarea>
+      <div class="actions">
+        <button type="button" id="file-info-continue-btn">Continue</button>
+        <button type="button" id="file-info-cancel-btn" class="btn-ghost">Cancel</button>
       </div>
     </div>
   </div>

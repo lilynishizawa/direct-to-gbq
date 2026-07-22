@@ -437,7 +437,7 @@ tbody tr:hover { background: var(--row-hover); }
 
 /* ---------- Detail modal ---------- */
 
-#modal-overlay, #sql-modal-overlay, #fuzzy-modal-overlay, #confirm-modal-overlay {
+#modal-overlay, #sql-modal-overlay, #fuzzy-modal-overlay, #confirm-modal-overlay, #file-info-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(15, 17, 21, 0.5);
@@ -450,7 +450,7 @@ tbody tr:hover { background: var(--row-hover); }
   z-index: 50;
 }
 
-#modal-overlay.hidden, #sql-modal-overlay.hidden, #fuzzy-modal-overlay.hidden, #confirm-modal-overlay.hidden {
+#modal-overlay.hidden, #sql-modal-overlay.hidden, #fuzzy-modal-overlay.hidden, #confirm-modal-overlay.hidden, #file-info-modal-overlay.hidden {
   display: none;
 }
 
@@ -512,7 +512,7 @@ tbody tr:hover { background: var(--row-hover); }
 
 /* ---------- SQL modal ---------- */
 
-#sql-modal, #fuzzy-modal {
+#sql-modal, #fuzzy-modal, #file-info-modal {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -522,9 +522,24 @@ tbody tr:hover { background: var(--row-hover); }
   width: 100%;
 }
 
-#sql-modal h2, #fuzzy-modal h2 {
+#sql-modal h2, #fuzzy-modal h2, #file-info-modal h2 {
   margin-top: 0;
   font-size: 1.1rem;
+}
+
+#file-info-preview {
+  display: block;
+  width: 100%;
+  background: var(--panel-alt);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 0.9rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+  white-space: pre-wrap;
+  resize: vertical;
+  min-height: 10em;
 }
 
 #confirm-modal {
@@ -582,15 +597,44 @@ tbody tr:hover { background: var(--row-hover); }
   margin-bottom: 1.25rem;
 }
 
+.patient-notes-row {
+  display: flex;
+  gap: 1.25rem;
+  margin-top: 0.9rem;
+  flex-wrap: wrap;
+}
+
 .patient-notes-label {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  margin-top: 0.9rem;
+  flex: 1 1 320px;
 }
 
 .patient-notes-label textarea {
   font-family: inherit;
+}
+
+.upload-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1 1 240px;
+  max-width: 320px;
+}
+
+.upload-col input[type="file"] {
+  font-size: 0.8rem;
+}
+
+.upload-status {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.upload-status.upload-error {
+  color: var(--danger);
 }
 
 .fuzzy-run-note {

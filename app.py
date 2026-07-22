@@ -16,6 +16,7 @@ Usage:
     In production this app is served by gunicorn instead (see Dockerfile).
 """
 
+import base64
 import hmac
 import json
 import os
@@ -47,6 +48,19 @@ FUZZY_MATCH_MAX_TOKENS = 32000
 FUZZY_MATCH_INPUT_PRICE_PER_MTOK = 5.00
 FUZZY_MATCH_OUTPUT_PRICE_PER_MTOK = 25.00
 
+FILE_EXTRACT_MODEL = FUZZY_MATCH_MODEL
+FILE_EXTRACT_MAX_TOKENS = 4096
+MAX_UPLOAD_FILE_BYTES = 15 * 1024 * 1024
+ALLOWED_UPLOAD_EXTENSIONS = {
+    ".pdf": "application/pdf",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".txt": "text/plain",
+}
+
 FORBIDDEN_SQL_KEYWORDS = re.compile(
     r"\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|MERGE|TRUNCATE|GRANT|REVOKE|CALL|EXPORT|LOAD)\b",
     re.IGNORECASE,
@@ -64,6 +78,8 @@ LIST_COLUMNS = """
 """
 
 app = Flask(__name__)
+# A little headroom above MAX_UPLOAD_FILE_BYTES for multipart/form-data overhead.
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_FILE_BYTES + 1_048_576
 client = bigquery.Client(project=PROJECT_ID)
 
 
@@ -97,6 +113,11 @@ def inject_asset_version():
             return 0
 
     return {"asset_version": asset_version}
+
+
+@app.errorhandler(413)
+def handle_file_too_large(_e):
+    return jsonify({"error": "File is too large (max 15 MB)"}), 413
 
 
 def json_safe(value):
@@ -670,6 +691,107 @@ def api_fuzzy_match_run():
         return jsonify({"error": "AI returned invalid JSON"}), 502
 
     return jsonify({"results": parsed.get("results", [])})
+
+
+FILE_EXTRACT_INSTRUCTIONS = """Based off the information provided in the file that the user uploaded, please extract the information necessary to fill out the "hard search" criteria.
+
+Report only what the file actually states -- do not guess or infer anything that isn't written down. Extract:
+- age: the patient's age in years, as a plain number written out as a string (e.g. "45"). If a birth date is given instead, compute the age from today's date. Empty string if not stated.
+- sex: "MALE" or "FEMALE" as stated for the patient. Empty string if not stated.
+- condition: a short diagnosis/condition name suitable for a clinical trial "condition" search box (e.g. "Type 2 Diabetes"). Empty string if no clear condition is stated.
+- notes: a short paragraph of other clinically relevant details from the file -- diagnoses, medications, prior treatments, biomarkers, etc. -- written the way a person would type it into a free-text "additional clinical information" box for a clinical trial eligibility search. Empty string if there's nothing else relevant."""
+
+
+def build_file_extract_content_block(file_storage):
+    """Validate an uploaded patient file and turn it into a Claude content
+    block. Raises QueryBuildError on anything invalid."""
+    filename = file_storage.filename or ""
+    ext = os.path.splitext(filename)[1].lower()
+    media_type = ALLOWED_UPLOAD_EXTENSIONS.get(ext)
+    if not media_type:
+        raise QueryBuildError(
+            "Unsupported file type -- upload a PDF, image (PNG/JPG/GIF/WEBP), or plain text file"
+        )
+
+    data = file_storage.read()
+    if not data:
+        raise QueryBuildError("Uploaded file is empty")
+    if len(data) > MAX_UPLOAD_FILE_BYTES:
+        raise QueryBuildError("File is too large (max 15 MB)")
+
+    if media_type == "application/pdf":
+        return {
+            "type": "document",
+            "source": {"type": "base64", "media_type": media_type, "data": base64.b64encode(data).decode("ascii")},
+        }
+    if media_type == "text/plain":
+        return {
+            "type": "document",
+            "source": {"type": "text", "media_type": "text/plain", "data": data.decode("utf-8", errors="replace")},
+        }
+    return {
+        "type": "image",
+        "source": {"type": "base64", "media_type": media_type, "data": base64.b64encode(data).decode("ascii")},
+    }
+
+
+FILE_EXTRACT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "age": {"type": "string"},
+        "sex": {"type": "string", "enum": ["MALE", "FEMALE", ""]},
+        "condition": {"type": "string"},
+        "notes": {"type": "string"},
+    },
+    "required": ["age", "sex", "condition", "notes"],
+    "additionalProperties": False,
+}
+
+
+@app.route("/api/extract-file", methods=["POST"])
+def api_extract_file():
+    """Reads a patient file the user uploaded and asks Claude to pull out the
+    basic info (age/sex/condition/other notes) used to pre-fill the search
+    form and the AI-match notes box."""
+    if "file" not in request.files or not request.files["file"].filename:
+        return jsonify({"error": "No file provided"}), 400
+
+    try:
+        content_block = build_file_extract_content_block(request.files["file"])
+    except QueryBuildError as e:
+        return jsonify({"error": str(e)}), 400
+
+    try:
+        ai_client = anthropic.Anthropic()
+        with ai_client.messages.stream(
+            model=FILE_EXTRACT_MODEL,
+            max_tokens=FILE_EXTRACT_MAX_TOKENS,
+            thinking={"type": "adaptive"},
+            output_config={"effort": "high", "format": {"type": "json_schema", "schema": FILE_EXTRACT_SCHEMA}},
+            messages=[{"role": "user", "content": [content_block, {"type": "text", "text": FILE_EXTRACT_INSTRUCTIONS}]}],
+        ) as stream:
+            response = stream.get_final_message()
+    except anthropic.RateLimitError:
+        return jsonify({"error": "Rate limited by the AI provider. Please wait and try again."}), 429
+    except anthropic.APIStatusError as e:
+        return jsonify({"error": f"AI request failed: {e.message}"}), 502
+    except anthropic.APIConnectionError as e:
+        return jsonify({"error": f"Could not reach the AI provider: {e}"}), 502
+    except Exception as e:
+        return jsonify({"error": f"AI request failed: {e}"}), 502
+
+    if response.stop_reason == "refusal":
+        return jsonify({"error": "The AI declined to process this file."}), 502
+
+    text = next((b.text for b in response.content if b.type == "text"), None)
+    if not text:
+        return jsonify({"error": "AI returned no output"}), 502
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return jsonify({"error": "AI returned invalid JSON"}), 502
+
+    return jsonify(parsed)
 
 
 if __name__ == "__main__":

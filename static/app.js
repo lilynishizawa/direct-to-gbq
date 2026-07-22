@@ -57,6 +57,7 @@ let state = {
   fuzzyResults: {},
   fuzzyPromptNctIds: [],
   resultsReminderTimer: null,
+  hasUploadedFile: false,
 };
 
 const LABEL_OVERRIDES = {
@@ -110,6 +111,16 @@ function clearFacetGroup(id) {
   document.querySelectorAll(`#${id}-panel .ms-option.selected`).forEach((o) => {
     o.classList.remove("selected");
     o.setAttribute("aria-selected", "false");
+  });
+  updateTriggerText(id);
+}
+
+function setFacetSelection(id, values) {
+  const set = new Set(values);
+  document.querySelectorAll(`#${id}-panel .ms-option`).forEach((opt) => {
+    const selected = set.has(opt.dataset.value);
+    opt.classList.toggle("selected", selected);
+    opt.setAttribute("aria-selected", String(selected));
   });
   updateTriggerText(id);
 }
@@ -360,6 +371,67 @@ function goToPage(page) {
   }
 }
 
+// ---------- Patient file upload ----------
+
+function describeExtraction(data) {
+  const filledParts = [];
+  if (data.age) filledParts.push(`age ${data.age}`);
+  if (data.sex === "MALE" || data.sex === "FEMALE") filledParts.push(`sex ${data.sex.toLowerCase()}`);
+  if (data.condition) filledParts.push(`condition "${data.condition}"`);
+
+  const filledMsg = filledParts.length
+    ? `Pre-filled ${filledParts.join(", ")} above.`
+    : "Couldn't confidently find age, sex, or condition in this file -- check the fields above.";
+  const notesMsg = data.notes ? " Added extracted details to the additional information box." : "";
+  return `${filledMsg}${notesMsg}`;
+}
+
+async function handleFileUpload(file) {
+  const statusEl = document.getElementById("upload-status");
+  statusEl.classList.remove("upload-error");
+  statusEl.textContent = "Extracting information from file...";
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  let data = null;
+  try {
+    const resp = await fetch("/api/extract-file", { method: "POST", body: formData });
+    try {
+      data = await resp.json();
+    } catch {
+      data = null;
+    }
+    if (!resp.ok) {
+      statusEl.textContent = `Error: ${(data && data.error) || resp.statusText}`;
+      statusEl.classList.add("upload-error");
+      return;
+    }
+  } catch (err) {
+    statusEl.textContent = `Error: ${err}`;
+    statusEl.classList.add("upload-error");
+    return;
+  }
+
+  if (data.age) {
+    document.getElementById("age").value = data.age;
+  }
+  if (data.sex === "MALE" || data.sex === "FEMALE") {
+    setFacetSelection("sex", [data.sex]);
+  }
+  if (data.condition) {
+    document.getElementById("condition").value = data.condition;
+  }
+  if (data.notes) {
+    const notesEl = document.getElementById("patient-notes");
+    const typed = notesEl.value.trim();
+    notesEl.value = typed ? `${typed}\n\n${data.notes}` : data.notes;
+  }
+
+  state.hasUploadedFile = true;
+  statusEl.textContent = describeExtraction(data);
+}
+
 // ---------- Fuzzy match ----------
 
 // Age and sex are now hard search filters (see buildParams / the "Sex"
@@ -477,6 +549,26 @@ function showFuzzyModal() {
 function hideFuzzyModal() {
   document.getElementById("fuzzy-modal-overlay").classList.add("hidden");
   document.getElementById("fuzzy-modal-run-btn").dataset.armed = "false";
+}
+
+// Only shown for users who uploaded a patient file -- lets them see and edit
+// exactly what will be used as the additional clinical information before
+// the (unchanged) prompt-preview/run flow below takes over.
+function showFileInfoModal() {
+  document.getElementById("file-info-preview").value = document.getElementById("patient-notes").value;
+  document.getElementById("file-info-modal-overlay").classList.remove("hidden");
+}
+
+function hideFileInfoModal() {
+  document.getElementById("file-info-modal-overlay").classList.add("hidden");
+}
+
+function onRunAiMatchClick() {
+  if (state.hasUploadedFile) {
+    showFileInfoModal();
+  } else {
+    openFuzzyPromptModal();
+  }
 }
 
 async function fetchFuzzyPromptAndCost(patient, nctIds) {
@@ -760,6 +852,10 @@ document.addEventListener("DOMContentLoaded", () => {
     state.customMode = false;
     state.originalSql = "";
     state.lastSearchRows = [];
+    state.hasUploadedFile = false;
+    document.getElementById("patient-file-input").value = "";
+    document.getElementById("upload-status").textContent = "";
+    document.getElementById("upload-status").classList.remove("upload-error");
 
     resetFuzzyPanel("Run a search to see how many trials qualify for AI matching.");
   });
@@ -819,11 +915,25 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("modal-tab-details").addEventListener("click", () => showModalTab("details"));
   document.getElementById("modal-tab-fuzzy").addEventListener("click", () => showModalTab("fuzzy"));
 
-  document.getElementById("fuzzy-run-btn").addEventListener("click", openFuzzyPromptModal);
+  document.getElementById("fuzzy-run-btn").addEventListener("click", onRunAiMatchClick);
   document.getElementById("fuzzy-modal-run-btn").addEventListener("click", runFuzzyMatchAi);
   document.getElementById("fuzzy-modal-cancel-btn").addEventListener("click", hideFuzzyModal);
   document.getElementById("fuzzy-modal-overlay").addEventListener("click", (e) => {
     if (e.target.id === "fuzzy-modal-overlay") hideFuzzyModal();
+  });
+
+  document.getElementById("patient-file-input").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (file) handleFileUpload(file);
+  });
+  document.getElementById("file-info-continue-btn").addEventListener("click", () => {
+    document.getElementById("patient-notes").value = document.getElementById("file-info-preview").value;
+    hideFileInfoModal();
+    openFuzzyPromptModal();
+  });
+  document.getElementById("file-info-cancel-btn").addEventListener("click", hideFileInfoModal);
+  document.getElementById("file-info-modal-overlay").addEventListener("click", (e) => {
+    if (e.target.id === "file-info-modal-overlay") hideFileInfoModal();
   });
 
   document.addEventListener("keydown", (e) => {
@@ -831,6 +941,7 @@ document.addEventListener("DOMContentLoaded", () => {
       closeModal();
       closeSqlModal();
       hideFuzzyModal();
+      hideFileInfoModal();
       closeAllDropdowns();
       if (activeConfirmCancel) activeConfirmCancel();
     }
