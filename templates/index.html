@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ClinicalTrials.gov Explorer</title>
+  <title>Clinical Trials Explorer</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ asset_version('style.css') }}">
 </head>
 <body>
@@ -26,216 +26,282 @@
       <div class="brand">
         <span class="brand-mark">CT</span>
         <div>
-          <h1>ClinicalTrials.gov Explorer</h1>
-          <p class="subtitle">{{ '`lily123.directdata.directtable`' }}</p>
+          <h1>Clinical Trials Explorer</h1>
+          <p class="subtitle">Find clinical trials that match you</p>
         </div>
+      </div>
+      <div class="debug-toggle-wrap">
+        <span class="filter-label">Debug mode</span>
+        <label class="switch">
+          <input type="checkbox" id="debug-toggle">
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </label>
       </div>
     </div>
   </header>
 
   <main>
-    <form id="filters">
-      <div class="filter-card">
-        <div class="filter-section">
-          <h2 class="section-title">Search</h2>
-          <div class="filter-grid">
-            <label>
-              <span class="filter-label">Keyword</span>
-              <input type="text" id="keyword" placeholder="title / summary contains...">
-            </label>
-            <label>
-              <span class="filter-label">Condition</span>
-              <input type="text" id="condition" placeholder="e.g. diabetes">
-            </label>
-            <label>
-              <span class="filter-label">Sponsor name</span>
-              <input type="text" id="sponsor" placeholder="e.g. pfizer">
-            </label>
-            <label>
-              <span class="filter-label">Patient age (years)</span>
-              <input type="number" id="age" min="0" max="130" placeholder="e.g. 45">
-            </label>
-          </div>
-        </div>
 
-        <div class="filter-section">
-          <h2 class="section-title">Facets</h2>
-          <div class="dropdown-filter-grid">
-            <div class="ms-field">
-              <span class="filter-label">Status</span>
-              <div class="ms-dropdown">
-                <button type="button" class="ms-trigger" id="status-trigger" aria-haspopup="listbox" aria-expanded="false">
-                  <span class="ms-trigger-text" id="status-text">Any</span>
-                  <span class="ms-caret" aria-hidden="true">&#9662;</span>
-                </button>
-                <div class="ms-panel hidden" id="status-panel" role="listbox" aria-multiselectable="true"></div>
-              </div>
-            </div>
-            <div class="ms-field">
-              <span class="filter-label">Study type</span>
-              <div class="ms-dropdown">
-                <button type="button" class="ms-trigger" id="study_type-trigger" aria-haspopup="listbox" aria-expanded="false">
-                  <span class="ms-trigger-text" id="study_type-text">Any</span>
-                  <span class="ms-caret" aria-hidden="true">&#9662;</span>
-                </button>
-                <div class="ms-panel hidden" id="study_type-panel" role="listbox" aria-multiselectable="true"></div>
-              </div>
-            </div>
-            <div class="ms-field">
-              <span class="filter-label">Phase</span>
-              <div class="ms-dropdown">
-                <button type="button" class="ms-trigger" id="phase-trigger" aria-haspopup="listbox" aria-expanded="false">
-                  <span class="ms-trigger-text" id="phase-text">Any</span>
-                  <span class="ms-caret" aria-hidden="true">&#9662;</span>
-                </button>
-                <div class="ms-panel hidden" id="phase-panel" role="listbox" aria-multiselectable="true"></div>
-              </div>
-            </div>
-            <div class="ms-field">
-              <span class="filter-label">Sponsor class</span>
-              <div class="ms-dropdown">
-                <button type="button" class="ms-trigger" id="sponsor_class-trigger" aria-haspopup="listbox" aria-expanded="false">
-                  <span class="ms-trigger-text" id="sponsor_class-text">Any</span>
-                  <span class="ms-caret" aria-hidden="true">&#9662;</span>
-                </button>
-                <div class="ms-panel hidden" id="sponsor_class-panel" role="listbox" aria-multiselectable="true"></div>
-              </div>
-            </div>
-            <div class="ms-field">
-              <span class="filter-label">Sex</span>
-              <div class="ms-dropdown">
-                <button type="button" class="ms-trigger" id="sex-trigger" aria-haspopup="listbox" aria-expanded="false">
-                  <span class="ms-trigger-text" id="sex-text">Any</span>
-                  <span class="ms-caret" aria-hidden="true">&#9662;</span>
-                </button>
-                <div class="ms-panel hidden" id="sex-panel" role="listbox" aria-multiselectable="true"></div>
-              </div>
-            </div>
-          </div>
-        </div>
+    <!-- ============ VIEW: landing ============ -->
+    <section id="view-landing" class="view">
+      <h2 class="hero-line">Search through <span id="stat-total" class="stat-total">&hellip;</span> trials in <span id="stat-city" class="city-flip">&hellip;</span></h2>
 
-        <details class="filter-section" id="refine-section">
-          <summary class="section-title">Refine</summary>
-          <div class="filter-grid">
-            <label>
-              <span class="filter-label">Healthy volunteers</span>
-              <select id="healthy_volunteers">
-                <option value="">Any</option>
-                <option value="true">Yes</option>
-                <option value="false">No</option>
-              </select>
-            </label>
-            <label>
-              <span class="filter-label">Has results</span>
-              <select id="has_results">
-                <option value="">Any</option>
-                <option value="true">Yes</option>
-                <option value="false">No</option>
-              </select>
-            </label>
-            <label>
-              <span class="filter-label">Enrollment min</span>
-              <input type="number" id="enrollment_min" min="0">
-            </label>
-            <label>
-              <span class="filter-label">Enrollment max</span>
-              <input type="number" id="enrollment_max" min="0">
-            </label>
-            <label>
-              <span class="filter-label">Start year from</span>
-              <input type="number" id="start_year_min" placeholder="e.g. 2015">
-            </label>
-            <label>
-              <span class="filter-label">Start year to</span>
-              <input type="number" id="start_year_max" placeholder="e.g. 2024">
-            </label>
-            <label>
-              <span class="filter-label">Sort by</span>
-              <select id="sort">
-                <option value="nct_id">NCT ID</option>
-                <option value="brief_title">Title</option>
-                <option value="overall_status">Status</option>
-                <option value="study_type">Study type</option>
-                <option value="start_date">Start date</option>
-                <option value="primary_completion_date">Primary completion date</option>
-                <option value="lead_sponsor">Sponsor</option>
-                <option value="enrollment_count">Enrollment</option>
-                <option value="has_results">Has results</option>
-              </select>
-            </label>
-            <label>
-              <span class="filter-label">Direction</span>
-              <select id="dir">
-                <option value="asc">Ascending</option>
-                <option value="desc">Descending</option>
-              </select>
-            </label>
-          </div>
-        </details>
+      <h2 class="page-heading">Get Started</h2>
 
-        <div class="actions">
-          <button type="submit" id="searchBtn">Search</button>
-          <button type="button" id="resetBtn" class="btn-ghost">Reset</button>
-        </div>
+      <div class="privacy-row">
+        <span class="privacy-text">Easy, secure, private:</span>
+        <span class="info-dot-wrap">
+          <button type="button" id="privacy-info-btn" class="info-dot" aria-label="More information">?</button>
+          <div id="privacy-popover" class="popover hidden">More information coming</div>
+        </span>
       </div>
-    </form>
-
-    <section id="patient-panel" class="filter-card patient-card">
-      <h2 class="section-title">Patient Profile (for fuzzy match)</h2>
-      <p class="subtitle">Age and sex come from the search filters above. Anything else relevant to eligibility goes here.</p>
-      <div class="patient-notes-row">
-        <label class="patient-notes-label">
-          <span class="filter-label">Additional clinical information</span>
-          <textarea id="patient-notes" rows="4" placeholder="Diagnoses, medications, prior treatments, biomarkers, etc. -- anything relevant to eligibility"></textarea>
-        </label>
-        <div class="upload-col">
-          <span class="filter-label">Upload patient file (optional)</span>
-          <input type="file" id="patient-file-input" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.txt">
-          <p class="subtitle">Claude will read it and pre-fill age, sex, and condition above, plus add relevant details to the notes box.</p>
-          <p id="upload-status" class="upload-status"></p>
-        </div>
+      <p class="upload-caption">Upload your medical file (MyChart)</p>
+      <div class="actions upload-actions">
+        <button type="button" id="upload-trigger-btn" class="btn-ghost">Upload file</button>
+        <input type="file" id="patient-file-input" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.txt" class="visually-hidden">
       </div>
-      <p class="subtitle fuzzy-run-note">Your search results are the hard criteria -- whatever trials your filters return are the candidate pool the AI reasons over.</p>
+      <p id="upload-status" class="upload-status"></p>
+
+      <form id="filters">
+        <div class="filter-card">
+          <h3 id="criteria-heading" class="criteria-heading">Or, fill out fields below</h3>
+
+          <div class="filter-section">
+            <h2 class="section-title">Search</h2>
+            <div class="filter-grid">
+              <label>
+                <span class="filter-label">Keyword</span>
+                <input type="text" id="keyword" placeholder="title / summary contains...">
+              </label>
+              <label>
+                <span class="filter-label">Condition</span>
+                <input type="text" id="condition" placeholder="e.g. diabetes">
+              </label>
+              <label>
+                <span class="filter-label">Sponsor name</span>
+                <input type="text" id="sponsor" placeholder="e.g. pfizer">
+              </label>
+              <label>
+                <span class="filter-label">Patient age (years)</span>
+                <input type="number" id="age" min="0" max="130" placeholder="e.g. 45">
+              </label>
+            </div>
+          </div>
+
+          <div class="filter-section">
+            <h2 class="section-title">Facets</h2>
+            <div class="dropdown-filter-grid">
+              <div class="ms-field">
+                <span class="filter-label">Status</span>
+                <div class="ms-dropdown">
+                  <button type="button" class="ms-trigger" id="status-trigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="ms-trigger-text" id="status-text">Any</span>
+                    <span class="ms-caret" aria-hidden="true">&#9662;</span>
+                  </button>
+                  <div class="ms-panel hidden" id="status-panel" role="listbox" aria-multiselectable="true"></div>
+                </div>
+              </div>
+              <div class="ms-field">
+                <span class="filter-label">Study type</span>
+                <div class="ms-dropdown">
+                  <button type="button" class="ms-trigger" id="study_type-trigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="ms-trigger-text" id="study_type-text">Any</span>
+                    <span class="ms-caret" aria-hidden="true">&#9662;</span>
+                  </button>
+                  <div class="ms-panel hidden" id="study_type-panel" role="listbox" aria-multiselectable="true"></div>
+                </div>
+              </div>
+              <div class="ms-field">
+                <span class="filter-label">Phase</span>
+                <div class="ms-dropdown">
+                  <button type="button" class="ms-trigger" id="phase-trigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="ms-trigger-text" id="phase-text">Any</span>
+                    <span class="ms-caret" aria-hidden="true">&#9662;</span>
+                  </button>
+                  <div class="ms-panel hidden" id="phase-panel" role="listbox" aria-multiselectable="true"></div>
+                </div>
+              </div>
+              <div class="ms-field">
+                <span class="filter-label">Sponsor class</span>
+                <div class="ms-dropdown">
+                  <button type="button" class="ms-trigger" id="sponsor_class-trigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="ms-trigger-text" id="sponsor_class-text">Any</span>
+                    <span class="ms-caret" aria-hidden="true">&#9662;</span>
+                  </button>
+                  <div class="ms-panel hidden" id="sponsor_class-panel" role="listbox" aria-multiselectable="true"></div>
+                </div>
+              </div>
+              <div class="ms-field">
+                <span class="filter-label">Sex</span>
+                <div class="ms-dropdown">
+                  <button type="button" class="ms-trigger" id="sex-trigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="ms-trigger-text" id="sex-text">Any</span>
+                    <span class="ms-caret" aria-hidden="true">&#9662;</span>
+                  </button>
+                  <div class="ms-panel hidden" id="sex-panel" role="listbox" aria-multiselectable="true"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <details class="filter-section" id="refine-section">
+            <summary class="section-title">Refine</summary>
+            <div class="filter-grid">
+              <label>
+                <span class="filter-label">Healthy volunteers</span>
+                <select id="healthy_volunteers">
+                  <option value="">Any</option>
+                  <option value="true">Yes</option>
+                  <option value="false">No</option>
+                </select>
+              </label>
+              <label>
+                <span class="filter-label">Has results</span>
+                <select id="has_results">
+                  <option value="">Any</option>
+                  <option value="true">Yes</option>
+                  <option value="false">No</option>
+                </select>
+              </label>
+              <label>
+                <span class="filter-label">Enrollment min</span>
+                <input type="number" id="enrollment_min" min="0">
+              </label>
+              <label>
+                <span class="filter-label">Enrollment max</span>
+                <input type="number" id="enrollment_max" min="0">
+              </label>
+              <label>
+                <span class="filter-label">Start year from</span>
+                <input type="number" id="start_year_min" placeholder="e.g. 2015">
+              </label>
+              <label>
+                <span class="filter-label">Start year to</span>
+                <input type="number" id="start_year_max" placeholder="e.g. 2024">
+              </label>
+              <label>
+                <span class="filter-label">Sort by</span>
+                <select id="sort">
+                  <option value="nct_id">NCT ID</option>
+                  <option value="brief_title">Title</option>
+                  <option value="overall_status">Status</option>
+                  <option value="study_type">Study type</option>
+                  <option value="start_date">Start date</option>
+                  <option value="primary_completion_date">Primary completion date</option>
+                  <option value="lead_sponsor">Sponsor</option>
+                  <option value="enrollment_count">Enrollment</option>
+                  <option value="has_results">Has results</option>
+                </select>
+              </label>
+              <label>
+                <span class="filter-label">Direction</span>
+                <select id="dir">
+                  <option value="asc">Ascending</option>
+                  <option value="desc">Descending</option>
+                </select>
+              </label>
+            </div>
+          </details>
+
+          <div class="filter-section">
+            <label class="notes-field">
+              <span class="filter-label" id="notes-label">Additional clinical information</span>
+              <textarea id="patient-notes" rows="4" placeholder="Diagnoses, medications, prior treatments, biomarkers, etc. -- anything relevant to eligibility"></textarea>
+            </label>
+          </div>
+
+          <div class="actions">
+            <button type="submit" id="searchBtn">Search</button>
+            <button type="button" id="resetBtn" class="btn-ghost">Reset</button>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <!-- ============ VIEW: results ============ -->
+    <section id="view-results" class="view hidden">
+      <h2 class="page-heading">Results</h2>
+      <section id="status-bar"></section>
+      <section id="results">
+        <table id="results-table">
+          <thead>
+            <tr>
+              <th>NCT ID</th>
+              <th>Title</th>
+              <th>Status</th>
+              <th>Phase</th>
+              <th>Study type</th>
+              <th>Start date</th>
+              <th>Sponsor</th>
+              <th>Sponsor class</th>
+              <th>Enrollment</th>
+              <th>Sex</th>
+              <th>Has results</th>
+            </tr>
+          </thead>
+          <tbody id="results-body"></tbody>
+        </table>
+        <div id="empty-state" class="empty-state">
+          <p>No results yet.</p>
+        </div>
+      </section>
+
+      <div class="pagination">
+        <button type="button" id="prevPage" class="btn-ghost" disabled>&laquo; Previous page</button>
+        <span id="pageInfo"></span>
+        <button type="button" id="nextPage" class="btn-ghost" disabled>Next page &raquo;</button>
+      </div>
+
       <p id="fuzzy-status" class="fuzzy-status">Run a search to see how many trials qualify for AI matching.</p>
-      <div class="actions">
-        <button type="button" id="fuzzy-run-btn" disabled>Run AI match</button>
-      </div>
       <div id="fuzzy-warning" class="fuzzy-warning hidden"></div>
-    </section>
 
-    <section id="status-bar"></section>
-
-    <div id="results-eligibility-summary" class="results-eligibility-summary hidden"></div>
-
-    <section id="results">
-      <table id="results-table">
-        <thead>
-          <tr>
-            <th>NCT ID</th>
-            <th>Title</th>
-            <th>Status</th>
-            <th>Phase</th>
-            <th>Study type</th>
-            <th>Start date</th>
-            <th>Sponsor</th>
-            <th>Sponsor class</th>
-            <th>Enrollment</th>
-            <th>Sex</th>
-            <th>Has results</th>
-          </tr>
-        </thead>
-        <tbody id="results-body"></tbody>
-      </table>
-      <div id="empty-state" class="empty-state">
-        <p>No results yet — set your filters above and click Search.</p>
+      <div class="actions view-actions">
+        <button type="button" id="backToCriteriaFromResultsBtn" class="btn-ghost">Back to criteria</button>
+        <button type="button" id="fuzzy-run-btn" disabled>Run AI Match</button>
       </div>
     </section>
 
-    <div class="pagination">
-      <button type="button" id="prevPage" class="btn-ghost" disabled>&laquo; Prev</button>
-      <span id="pageInfo"></span>
-      <button type="button" id="nextPage" class="btn-ghost" disabled>Next &raquo;</button>
-    </div>
+    <!-- ============ VIEW: ai-results ============ -->
+    <section id="view-ai-results" class="view hidden">
+      <h2 class="page-heading">AI Scanned Results</h2>
+      <p id="results-eligibility-summary" class="results-eligibility-summary"></p>
+
+      <section id="ai-results">
+        <table id="ai-results-table">
+          <thead>
+            <tr>
+              <th>Eligibility</th>
+              <th>NCT ID</th>
+              <th>Title</th>
+              <th>Status</th>
+              <th>Phase</th>
+              <th>Study type</th>
+              <th>Start date</th>
+              <th>Sponsor</th>
+              <th>Sponsor class</th>
+              <th>Enrollment</th>
+              <th>Sex</th>
+              <th>Has results</th>
+            </tr>
+          </thead>
+          <tbody id="ai-results-body"></tbody>
+        </table>
+        <div id="ai-empty-state" class="empty-state hidden">
+          <p>No AI results yet.</p>
+        </div>
+      </section>
+
+      <div class="pagination">
+        <button type="button" id="aiPrevPage" class="btn-ghost" disabled>&laquo; Previous page</button>
+        <span id="aiPageInfo"></span>
+        <button type="button" id="aiNextPage" class="btn-ghost" disabled>Next page &raquo;</button>
+      </div>
+
+      <div class="actions view-actions">
+        <button type="button" id="backToCriteriaFromAiBtn" class="btn-ghost">Back to criteria</button>
+        <button type="button" id="exportBtn">Export</button>
+      </div>
+    </section>
   </main>
 
   <div id="modal-overlay" class="hidden">
@@ -260,28 +326,6 @@
       <div class="actions">
         <button type="button" id="fuzzy-modal-run-btn">Run AI match</button>
         <button type="button" id="fuzzy-modal-cancel-btn" class="btn-ghost">Cancel</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="file-info-modal-overlay" class="hidden">
-    <div id="file-info-modal">
-      <h2>Review information from your uploaded file</h2>
-      <p class="subtitle">This is what will be used as the "Additional clinical information" for the AI eligibility check. Edit anything before continuing.</p>
-      <textarea id="file-info-preview" rows="10" spellcheck="false"></textarea>
-      <div class="actions">
-        <button type="button" id="file-info-continue-btn">Continue</button>
-        <button type="button" id="file-info-cancel-btn" class="btn-ghost">Cancel</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="confirm-modal-overlay" class="hidden">
-    <div id="confirm-modal">
-      <p id="confirm-modal-message"></p>
-      <div class="actions">
-        <button type="button" id="confirm-modal-yes-btn">Yes</button>
-        <button type="button" id="confirm-modal-cancel-btn" class="btn-ghost">Cancel</button>
       </div>
     </div>
   </div>

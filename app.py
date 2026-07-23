@@ -618,8 +618,14 @@ def api_fuzzy_match_candidates():
         if total > FUZZY_MATCH_MAX_TRIALS:
             return jsonify({"total": total, "trials": None})
 
+        # Full LIST_COLUMNS (not just nct_id/brief_title) so the AI Scanned
+        # Results page can render these rows directly -- this candidate list
+        # is independently ordered by nct_id regardless of the hard-search
+        # page's own sort/pagination, so joining eligibility results back
+        # onto the hard-search page's rows would silently drop trials
+        # whenever the two orderings diverge.
         detail_query = f"""
-            SELECT nct_id, brief_title
+            SELECT {LIST_COLUMNS}
             FROM {TABLE_REF}
             WHERE {where_sql}
             ORDER BY nct_id

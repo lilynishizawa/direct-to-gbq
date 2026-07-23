@@ -27,9 +27,8 @@ const SEARCH_COLUMNS = [
   { key: "has_results", label: "Has results", format: (v) => (v ? "Yes" : "No") },
 ];
 
-// Prepended to SEARCH_COLUMNS once AI results exist, so eligibility shows
-// as the leftmost column of the existing results table instead of a
-// separate table.
+// Prepended to SEARCH_COLUMNS on the AI Scanned Results page, so eligibility
+// shows as the leftmost column alongside the same trial columns.
 const ELIGIBILITY_COLUMN = {
   key: "eligibility",
   label: "Eligibility",
@@ -41,9 +40,12 @@ const ELIGIBILITY_COLUMN = {
   },
 };
 
-// Sort order once AI eligibility results exist: Eligible first, then
-// Uncertain, then Ineligible, with any unmatched rows (no AI result) last.
+// Sort order on the AI Scanned Results page: Eligible first, then
+// Uncertain, then Ineligible, with any unmatched rows last.
 const ELIGIBILITY_RANK = { Eligible: 0, Uncertain: 1, Ineligible: 2 };
+
+// Must match FUZZY_MATCH_MAX_TRIALS in app.py.
+const AI_MATCH_MAX_TRIALS = 20;
 
 let state = {
   page: 1,
@@ -56,8 +58,13 @@ let state = {
   fuzzyCandidates: null,
   fuzzyResults: {},
   fuzzyPromptNctIds: [],
-  resultsReminderTimer: null,
   hasUploadedFile: false,
+  debugMode: false,
+  aiPage: 1,
+  aiPageSize: 20,
+  cities: [],
+  cityIndex: 0,
+  cityTimer: null,
 };
 
 const LABEL_OVERRIDES = {
@@ -76,6 +83,55 @@ function labelize(value) {
     .split("_")
     .map((w) => w[0].toUpperCase() + w.slice(1))
     .join(" ");
+}
+
+// ---------- View switching ----------
+
+function showView(name) {
+  document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
+  document.getElementById(`view-${name}`).classList.remove("hidden");
+  window.scrollTo(0, 0);
+}
+
+// ---------- Debug mode (persisted across visits) ----------
+
+function loadDebugMode() {
+  state.debugMode = localStorage.getItem("debugMode") === "true";
+  document.getElementById("debug-toggle").checked = state.debugMode;
+}
+
+// ---------- Landing stats / rotating city ----------
+
+async function loadStats() {
+  try {
+    const resp = await fetch("/api/stats");
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || resp.statusText);
+    document.getElementById("stat-total").textContent = (data.total_trials || 0).toLocaleString();
+    state.cities = data.cities && data.cities.length ? data.cities : ["your area"];
+    showNextCity(true);
+    if (state.cityTimer) clearInterval(state.cityTimer);
+    if (state.cities.length > 1) {
+      state.cityTimer = setInterval(() => showNextCity(false), 2400);
+    }
+  } catch (err) {
+    document.getElementById("stat-total").textContent = "many";
+  }
+}
+
+function showNextCity(immediate) {
+  const el = document.getElementById("stat-city");
+  const city = state.cities[state.cityIndex % state.cities.length];
+  state.cityIndex++;
+  if (immediate) {
+    el.textContent = city;
+    return;
+  }
+  el.classList.add("flipping");
+  setTimeout(() => {
+    el.textContent = city;
+    el.classList.remove("flipping");
+  }, 220);
 }
 
 function updateTriggerText(id) {
@@ -201,12 +257,13 @@ function formatCell(value) {
   return String(value);
 }
 
-// Renders both the fixed search-result schema and arbitrary custom-query
-// column sets, since an edited query can select whatever columns it likes.
-function renderTable(columns, rows, onRowClick) {
-  const headRow = document.querySelector("#results-table thead tr");
-  const body = document.getElementById("results-body");
-  const emptyState = document.getElementById("empty-state");
+// Renders into whichever table/body/empty-state triple is named -- used for
+// both the plain Results table and the AI Scanned Results table, plus
+// arbitrary custom-query column sets on the Results table.
+function renderTable(tableId, bodyId, emptyId, columns, rows, onRowClick) {
+  const headRow = document.querySelector(`#${tableId} thead tr`);
+  const body = document.getElementById(bodyId);
+  const emptyState = document.getElementById(emptyId);
   headRow.innerHTML = columns.map((c) => `<th>${escapeHtml(c.label)}</th>`).join("");
   body.innerHTML = "";
   emptyState.classList.toggle("hidden", rows.length > 0);
@@ -232,24 +289,8 @@ function renderTable(columns, rows, onRowClick) {
   }
 }
 
-// Wraps renderTable() for the main search results specifically: prepends
-// the Eligibility column (and merges each row's AI result onto it) once AI
-// matching has produced results for the current search, so eligibility
-// shows inline instead of in a separate table.
 function renderResultsTable(rows) {
-  const hasFuzzy = Object.keys(state.fuzzyResults).length > 0;
-  const columns = hasFuzzy ? [ELIGIBILITY_COLUMN, ...SEARCH_COLUMNS] : SEARCH_COLUMNS;
-  let renderRows = rows;
-  if (hasFuzzy) {
-    renderRows = rows
-      .map((r) => ({ ...r, eligibility: state.fuzzyResults[r.nct_id] }))
-      .sort((a, b) => {
-        const rankA = ELIGIBILITY_RANK[a.eligibility?.overall] ?? 3;
-        const rankB = ELIGIBILITY_RANK[b.eligibility?.overall] ?? 3;
-        return rankA - rankB;
-      });
-  }
-  renderTable(columns, renderRows, (row) => openDetail(row.nct_id));
+  renderTable("results-table", "results-body", "empty-state", SEARCH_COLUMNS, rows, (row) => openDetail(row.nct_id));
 }
 
 async function runSearch(page) {
@@ -304,7 +345,7 @@ async function runCustomQuery(sql) {
     }
     const columns = data.columns.map((c) => ({ key: c, label: c }));
     const hasNctId = data.columns.includes("nct_id");
-    renderTable(columns, data.rows, hasNctId ? (row) => openDetail(row.nct_id) : null);
+    renderTable("results-table", "results-body", "empty-state", columns, data.rows, hasNctId ? (row) => openDetail(row.nct_id) : null);
     document.getElementById("pageInfo").textContent = "";
     document.getElementById("prevPage").disabled = true;
     document.getElementById("nextPage").disabled = true;
@@ -326,9 +367,10 @@ function hideSqlModal() {
   document.getElementById("sql-modal-overlay").classList.add("hidden");
 }
 
-// Every new filter combination is previewed before it touches BigQuery.
-// Paging within an already-approved search re-runs immediately (same
-// query, just a different OFFSET) rather than re-prompting every click.
+// Every new filter combination is previewed before it touches BigQuery
+// (debug mode only). Paging within an already-approved search re-runs
+// immediately (same query, just a different OFFSET) rather than
+// re-prompting every click.
 async function requestSearchApproval(page) {
   const params = buildParams(page);
   const errorBox = document.getElementById("sql-modal-error");
@@ -364,10 +406,26 @@ async function requestSearchApproval(page) {
 }
 
 function goToPage(page) {
+  if (state.customMode) return;
   if (state.approvedSignature === filterSignature()) {
     runSearch(page);
   } else {
     requestSearchApproval(page);
+  }
+}
+
+// The Search button on the landing page: with debug mode on, show the
+// editable query preview first; with it off, run straight through.
+async function goSearch() {
+  if (state.debugMode) {
+    requestSearchApproval(1);
+    return;
+  }
+  const ok = await runSearch(1);
+  if (ok) {
+    state.approvedSignature = filterSignature();
+    showView("results");
+    refreshFuzzyCandidates();
   }
 }
 
@@ -381,8 +439,8 @@ function describeExtraction(data) {
 
   const filledMsg = filledParts.length
     ? `Pre-filled ${filledParts.join(", ")} above.`
-    : "Couldn't confidently find age, sex, or condition in this file -- check the fields above.";
-  const notesMsg = data.notes ? " Added extracted details to the additional information box." : "";
+    : "Couldn't confidently find age, sex, or condition in this file -- check the fields below.";
+  const notesMsg = data.notes ? " Added a summary to the additional information box." : "";
   return `${filledMsg}${notesMsg}`;
 }
 
@@ -429,14 +487,14 @@ async function handleFileUpload(file) {
   }
 
   state.hasUploadedFile = true;
+  document.getElementById("criteria-heading").textContent = "Please confirm:";
   statusEl.textContent = describeExtraction(data);
 }
 
 // ---------- Fuzzy match ----------
 
-// Age and sex are now hard search filters (see buildParams / the "Sex"
-// facet) rather than separate patient-panel inputs -- the patient profile
-// pulls them from there instead of asking for them twice.
+// Age and sex come from the hard search filters (see buildParams / the
+// "Sex" facet) rather than separate patient-panel inputs.
 function getPatientProfile() {
   const sexValues = selectedValues("sex").filter((v) => v === "MALE" || v === "FEMALE");
   return {
@@ -456,13 +514,14 @@ function resetFuzzyPanel(message) {
   document.getElementById("fuzzy-status").textContent = message;
   document.getElementById("fuzzy-warning").classList.add("hidden");
   document.getElementById("fuzzy-run-btn").disabled = true;
-  document.getElementById("results-eligibility-summary").classList.add("hidden");
+  document.getElementById("fuzzy-run-btn").textContent = "Run AI Match";
+  document.getElementById("results-eligibility-summary").textContent = "";
+  document.getElementById("ai-results-body").innerHTML = "";
 }
 
-// The main search's filters ARE the hard criteria -- whatever trials the
-// search matches (across all pages, not just the visible one) become the
-// candidate pool for AI matching. Called right after a search is approved
-// and run, using the same filter params (minus paging/sort).
+// The hard search's filters ARE the candidate pool for AI matching. Called
+// right after a search is approved and run, using the same filter params
+// (minus paging/sort).
 async function refreshFuzzyCandidates() {
   const statusEl = document.getElementById("fuzzy-status");
   const warningEl = document.getElementById("fuzzy-warning");
@@ -470,12 +529,8 @@ async function refreshFuzzyCandidates() {
   warningEl.classList.add("hidden");
   state.fuzzyCandidates = null;
   runBtn.disabled = true;
-
-  // A fresh hard search invalidates any previous AI assessment -- the
-  // candidate pool (and possibly the patient profile) may have changed.
   state.fuzzyResults = {};
-  document.getElementById("results-eligibility-summary").classList.add("hidden");
-  renderResultsTable(state.lastSearchRows);
+  document.getElementById("results-eligibility-summary").textContent = "";
 
   statusEl.textContent = "Checking how many searched trials qualify for AI matching...";
 
@@ -493,9 +548,9 @@ async function refreshFuzzyCandidates() {
       return;
     }
     state.fuzzyCandidates = data;
-    if (data.total > 100) {
+    if (data.total > AI_MATCH_MAX_TRIALS) {
       statusEl.textContent = `Your search matched ${data.total.toLocaleString()} trials.`;
-      warningEl.textContent = `Too many matching trials (${data.total.toLocaleString()}) to run AI matching -- narrow your search filters to 100 or fewer trials.`;
+      warningEl.textContent = `Too many matching trials (${data.total.toLocaleString()}) to run AI matching -- narrow your search filters to ${AI_MATCH_MAX_TRIALS} or fewer trials.`;
       warningEl.classList.remove("hidden");
       runBtn.disabled = true;
     } else {
@@ -507,41 +562,6 @@ async function refreshFuzzyCandidates() {
   }
 }
 
-// ---------- Generic Yes/Cancel confirm modal ----------
-
-let activeConfirmCancel = null;
-
-// okOnly renders a single acknowledgement button (no real choice to make --
-// used for the empty-notes heads-up, which isn't a gate, just a notice).
-function showConfirm(message, { okOnly = false } = {}) {
-  return new Promise((resolve) => {
-    const overlay = document.getElementById("confirm-modal-overlay");
-    const yesBtn = document.getElementById("confirm-modal-yes-btn");
-    const cancelBtn = document.getElementById("confirm-modal-cancel-btn");
-    document.getElementById("confirm-modal-message").textContent = message;
-    yesBtn.textContent = okOnly ? "OK" : "Yes";
-    cancelBtn.classList.toggle("hidden", okOnly);
-
-    function cleanup(result) {
-      overlay.classList.add("hidden");
-      yesBtn.removeEventListener("click", onYes);
-      cancelBtn.removeEventListener("click", onCancel);
-      overlay.removeEventListener("click", onOverlay);
-      activeConfirmCancel = null;
-      resolve(result);
-    }
-    function onYes() { cleanup(true); }
-    function onCancel() { cleanup(false); }
-    function onOverlay(e) { if (e.target.id === "confirm-modal-overlay") cleanup(okOnly); }
-
-    yesBtn.addEventListener("click", onYes);
-    cancelBtn.addEventListener("click", onCancel);
-    overlay.addEventListener("click", onOverlay);
-    activeConfirmCancel = okOnly ? onYes : onCancel;
-    overlay.classList.remove("hidden");
-  });
-}
-
 function showFuzzyModal() {
   document.getElementById("fuzzy-modal-overlay").classList.remove("hidden");
 }
@@ -551,23 +571,13 @@ function hideFuzzyModal() {
   document.getElementById("fuzzy-modal-run-btn").dataset.armed = "false";
 }
 
-// Only shown for users who uploaded a patient file -- lets them see and edit
-// exactly what will be used as the additional clinical information before
-// the (unchanged) prompt-preview/run flow below takes over.
-function showFileInfoModal() {
-  document.getElementById("file-info-preview").value = document.getElementById("patient-notes").value;
-  document.getElementById("file-info-modal-overlay").classList.remove("hidden");
-}
-
-function hideFileInfoModal() {
-  document.getElementById("file-info-modal-overlay").classList.add("hidden");
-}
-
+// Debug mode decides whether Run AI Match shows the prompt/cost preview
+// first, or just runs.
 function onRunAiMatchClick() {
-  if (state.hasUploadedFile) {
-    showFileInfoModal();
-  } else {
+  if (state.debugMode) {
     openFuzzyPromptModal();
+  } else {
+    runFuzzyMatchDirect();
   }
 }
 
@@ -602,8 +612,6 @@ function displayFuzzyPromptModal(data, nctIds) {
   showFuzzyModal();
 }
 
-// The manual "Run AI match" button -- fetches the prompt + cost and shows
-// the review modal, which is where the cost estimate actually gets shown.
 async function openFuzzyPromptModal() {
   if (!state.fuzzyCandidates || !state.fuzzyCandidates.trials || !state.fuzzyCandidates.trials.length) return;
   const patient = getPatientProfile();
@@ -634,20 +642,48 @@ async function openFuzzyPromptModal() {
   }
 }
 
-// The one automatic popup: 2 seconds after hard search results land, remind
-// the user how to get AI filtering, rather than gating/chaining any further
-// confirms on top of it.
-function scheduleResultsReminder() {
-  if (state.resultsReminderTimer) clearTimeout(state.resultsReminderTimer);
-  state.resultsReminderTimer = setTimeout(() => {
-    state.resultsReminderTimer = null;
-    showConfirm("Fill out patient profile for further filtering and then click 'Run AI Match'.", { okOnly: true });
-  }, 2000);
+// Debug mode off: run the AI match directly against the candidate pool,
+// with no prompt-preview modal.
+async function runFuzzyMatchDirect() {
+  if (!state.fuzzyCandidates || !state.fuzzyCandidates.trials || !state.fuzzyCandidates.trials.length) return;
+  const patient = getPatientProfile();
+  if (!patientProfileValid(patient)) {
+    document.getElementById("fuzzy-status").textContent =
+      "Select the patient's sex and enter their age in the search filters above before running the AI match.";
+    return;
+  }
+
+  const nctIds = state.fuzzyCandidates.trials.map((t) => t.nct_id);
+  const runBtn = document.getElementById("fuzzy-run-btn");
+  const statusEl = document.getElementById("fuzzy-status");
+  runBtn.disabled = true;
+  const originalLabel = runBtn.textContent;
+  runBtn.textContent = "Running...";
+  statusEl.textContent = "Running AI match...";
+
+  try {
+    const resp = await fetch("/api/fuzzy-match/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ patient, nct_ids: nctIds }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      statusEl.textContent = `Error: ${data.error || resp.statusText}`;
+      return;
+    }
+    applyFuzzyResults(data.results);
+    showView("ai-results");
+  } catch (err) {
+    statusEl.textContent = `Error: ${err}`;
+  } finally {
+    runBtn.disabled = false;
+    runBtn.textContent = originalLabel;
+  }
 }
 
-// Eligibility results land inline as the leftmost column of the existing
-// results table (see renderResultsTable), plus a counts header above it --
-// no separate results table.
+// Eligibility results land on the AI Scanned Results page: a counts summary
+// plus the same trial columns with an Eligibility column, client-paginated.
 function applyFuzzyResults(results) {
   state.fuzzyResults = {};
   for (const r of results) state.fuzzyResults[r.nct_id] = r;
@@ -656,11 +692,44 @@ function applyFuzzyResults(results) {
   for (const r of results) {
     if (counts[r.overall] !== undefined) counts[r.overall]++;
   }
-  const summaryEl = document.getElementById("results-eligibility-summary");
-  summaryEl.textContent = `${counts.Eligible} Eligible, ${counts.Uncertain} Uncertain, ${counts.Ineligible} Ineligible`;
-  summaryEl.classList.remove("hidden");
+  document.getElementById("results-eligibility-summary").textContent =
+    `${counts.Eligible} Eligible, ${counts.Uncertain} Uncertain, ${counts.Ineligible} Ineligible`;
 
-  renderResultsTable(state.lastSearchRows);
+  state.aiPage = 1;
+  renderAiResultsPage();
+}
+
+// Built from the AI-match candidate list (state.fuzzyCandidates.trials),
+// not the hard-search page's own rows -- the candidate list is always
+// ordered by nct_id regardless of the hard-search page's sort/pagination,
+// so it's the row set that actually lines up with state.fuzzyResults.
+function buildAiResultsRows() {
+  const candidates = (state.fuzzyCandidates && state.fuzzyCandidates.trials) || [];
+  return candidates
+    .filter((r) => state.fuzzyResults[r.nct_id])
+    .map((r) => ({ ...r, eligibility: state.fuzzyResults[r.nct_id] }))
+    .sort((a, b) => {
+      const rankA = ELIGIBILITY_RANK[a.eligibility?.overall] ?? 3;
+      const rankB = ELIGIBILITY_RANK[b.eligibility?.overall] ?? 3;
+      return rankA - rankB;
+    });
+}
+
+function renderAiResultsPage() {
+  const rows = buildAiResultsRows();
+  const pageSize = state.aiPageSize;
+  const totalPages = Math.max(Math.ceil(rows.length / pageSize), 1);
+  state.aiPage = Math.min(Math.max(state.aiPage, 1), totalPages);
+  const start = (state.aiPage - 1) * pageSize;
+  const pageRows = rows.slice(start, start + pageSize);
+
+  const columns = [ELIGIBILITY_COLUMN, ...SEARCH_COLUMNS];
+  renderTable("ai-results-table", "ai-results-body", "ai-empty-state", columns, pageRows, (row) => openDetail(row.nct_id));
+
+  document.getElementById("aiPageInfo").textContent =
+    `Page ${state.aiPage} of ${totalPages} (${rows.length.toLocaleString()} results)`;
+  document.getElementById("aiPrevPage").disabled = state.aiPage <= 1;
+  document.getElementById("aiNextPage").disabled = state.aiPage >= totalPages;
 }
 
 async function runFuzzyMatchAi() {
@@ -688,6 +757,7 @@ async function runFuzzyMatchAi() {
     }
     applyFuzzyResults(data.results);
     hideFuzzyModal();
+    showView("ai-results");
   } catch (err) {
     errorBox.textContent = String(err);
     errorBox.classList.remove("hidden");
@@ -821,33 +891,53 @@ function closeSqlModal() {
   document.getElementById("sql-run-btn").dataset.armed = "false";
 }
 
+function hidePrivacyPopover() {
+  document.getElementById("privacy-popover").classList.add("hidden");
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   populateFacetSelects();
   initDropdowns();
-  document.getElementById("status-bar").textContent =
-    "Set your filters and click Search to preview the query.";
+  loadDebugMode();
+  loadStats();
+  showView("landing");
+
+  document.getElementById("debug-toggle").addEventListener("change", (e) => {
+    state.debugMode = e.target.checked;
+    localStorage.setItem("debugMode", String(state.debugMode));
+  });
+
+  document.getElementById("privacy-info-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    document.getElementById("privacy-popover").classList.toggle("hidden");
+  });
+  document.addEventListener("click", () => hidePrivacyPopover());
+
+  document.getElementById("upload-trigger-btn").addEventListener("click", () => {
+    document.getElementById("patient-file-input").click();
+  });
+  document.getElementById("patient-file-input").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (file) handleFileUpload(file);
+  });
 
   document.getElementById("filters").addEventListener("submit", (e) => {
     e.preventDefault();
-    requestSearchApproval(1);
+    goSearch();
   });
 
   document.getElementById("resetBtn").addEventListener("click", () => {
-    if (state.resultsReminderTimer) {
-      clearTimeout(state.resultsReminderTimer);
-      state.resultsReminderTimer = null;
-    }
     document.getElementById("filters").reset();
     for (const id of ["status", "study_type", "phase", "sponsor_class", "sex"]) {
       clearFacetGroup(id);
     }
     document.getElementById("results-body").innerHTML = "";
     document.getElementById("empty-state").classList.remove("hidden");
+    document.getElementById("empty-state").querySelector("p").textContent = "No results yet.";
     document.getElementById("pageInfo").textContent = "";
     document.getElementById("prevPage").disabled = true;
     document.getElementById("nextPage").disabled = true;
-    document.getElementById("status-bar").textContent =
-      "Set your filters and click Search to preview the query.";
+    document.getElementById("status-bar").textContent = "";
     state.approvedSignature = null;
     state.customMode = false;
     state.originalSql = "";
@@ -857,6 +947,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("upload-status").textContent = "";
     document.getElementById("upload-status").classList.remove("upload-error");
     document.getElementById("patient-notes").value = "";
+    document.getElementById("criteria-heading").textContent = "Or, fill out fields below";
 
     resetFuzzyPanel("Run a search to see how many trials qualify for AI matching.");
   });
@@ -865,6 +956,20 @@ document.addEventListener("DOMContentLoaded", () => {
     if (state.page > 1) goToPage(state.page - 1);
   });
   document.getElementById("nextPage").addEventListener("click", () => goToPage(state.page + 1));
+
+  document.getElementById("aiPrevPage").addEventListener("click", () => {
+    if (state.aiPage > 1) {
+      state.aiPage--;
+      renderAiResultsPage();
+    }
+  });
+  document.getElementById("aiNextPage").addEventListener("click", () => {
+    state.aiPage++;
+    renderAiResultsPage();
+  });
+
+  document.getElementById("backToCriteriaFromResultsBtn").addEventListener("click", () => showView("landing"));
+  document.getElementById("backToCriteriaFromAiBtn").addEventListener("click", () => showView("landing"));
 
   document.getElementById("modal-close").addEventListener("click", closeModal);
   document.getElementById("modal-overlay").addEventListener("click", (e) => {
@@ -886,12 +991,13 @@ document.addEventListener("DOMContentLoaded", () => {
       ok = await runSearch(page);
       if (ok) {
         state.approvedSignature = filterSignature();
+        showView("results");
         refreshFuzzyCandidates();
-        scheduleResultsReminder();
       }
     } else {
       ok = await runCustomQuery(currentSql);
       if (ok) {
+        showView("results");
         resetFuzzyPanel("Fuzzy match isn't available for hand-edited SQL results -- run a normal search to use it.");
       }
     }
@@ -923,28 +1029,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.target.id === "fuzzy-modal-overlay") hideFuzzyModal();
   });
 
-  document.getElementById("patient-file-input").addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (file) handleFileUpload(file);
-  });
-  document.getElementById("file-info-continue-btn").addEventListener("click", () => {
-    document.getElementById("patient-notes").value = document.getElementById("file-info-preview").value;
-    hideFileInfoModal();
-    openFuzzyPromptModal();
-  });
-  document.getElementById("file-info-cancel-btn").addEventListener("click", hideFileInfoModal);
-  document.getElementById("file-info-modal-overlay").addEventListener("click", (e) => {
-    if (e.target.id === "file-info-modal-overlay") hideFileInfoModal();
-  });
-
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       closeModal();
       closeSqlModal();
       hideFuzzyModal();
-      hideFileInfoModal();
+      hidePrivacyPopover();
       closeAllDropdowns();
-      if (activeConfirmCancel) activeConfirmCancel();
     }
   });
 });
