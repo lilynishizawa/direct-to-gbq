@@ -4,23 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Clinical Trials Explorer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ asset_version('style.css') }}">
 </head>
 <body>
-  <div class="bg-watermark" aria-hidden="true">
-    <svg viewBox="0 0 200 420" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="100" y1="95" x2="100" y2="385"/>
-      <path d="M100 90 C 75 68, 45 72, 20 50 C 40 82, 55 90, 95 98"/>
-      <path d="M100 90 C 125 68, 155 72, 180 50 C 160 82, 145 90, 105 98"/>
-      <path d="M62 66 C 52 58, 38 57, 27 50"/>
-      <path d="M138 66 C 148 58, 162 57, 173 50"/>
-      <path d="M100 385 C 140 365, 140 345, 100 325 C 60 305, 60 285, 100 265 C 140 245, 140 225, 100 205 C 60 185, 60 165, 100 145 C 128 129, 136 114, 120 100"/>
-      <path d="M100 385 C 60 365, 60 345, 100 325 C 140 305, 140 285, 100 265 C 60 245, 60 225, 100 205 C 140 185, 140 165, 100 145 C 72 129, 64 114, 80 100"/>
-      <path d="M120 100 C 129 92, 129 83, 118 80 C 111 79, 106 84, 108 91"/>
-      <path d="M80 100 C 71 92, 71 83, 82 80 C 89 79, 94 84, 92 91"/>
-    </svg>
-  </div>
-
   <header>
     <div class="header-inner">
       <div class="brand">
@@ -44,7 +33,9 @@
 
     <!-- ============ VIEW: landing ============ -->
     <section id="view-landing" class="view">
-      <h2 class="hero-line">Search through <span id="stat-total" class="stat-total">&hellip;</span> trials in <span id="stat-city" class="city-flip">&hellip;</span></h2>
+      <div class="hero-card">
+        <h2 class="hero-line">Search through <span id="stat-total" class="stat-pill stat-total">&hellip;</span> trials in <span id="stat-city" class="stat-pill city-flip">&hellip;</span></h2>
+      </div>
 
       <h2 class="page-heading">Get Started</h2>
 
