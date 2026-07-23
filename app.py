@@ -42,7 +42,7 @@ DEFAULT_PAGE_SIZE = 25
 MAX_CUSTOM_SQL_ROWS = 500
 
 FUZZY_MATCH_MODEL = "claude-opus-4-8"
-FUZZY_MATCH_MAX_TRIALS = 100
+FUZZY_MATCH_MAX_TRIALS = 20
 FUZZY_MATCH_MAX_TOKENS = 32000
 # claude-opus-4-8 pricing, per million tokens.
 FUZZY_MATCH_INPUT_PRICE_PER_MTOK = 5.00
@@ -357,6 +357,29 @@ def build_search_query(args):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/api/stats")
+def api_stats():
+    """Powers the landing page's "Search through N trials in <city>" line:
+    a live total row count, plus the most common trial-site cities for the
+    rotating city text."""
+    query = f"""
+        SELECT
+          (SELECT COUNT(*) FROM {TABLE_REF}) AS total_trials,
+          ARRAY(
+            SELECT city FROM (
+              SELECT loc.city AS city, COUNT(*) AS n
+              FROM {TABLE_REF}, UNNEST(locations) AS loc
+              WHERE loc.city IS NOT NULL AND loc.city != ''
+              GROUP BY loc.city
+              ORDER BY n DESC
+              LIMIT 25
+            )
+          ) AS cities
+    """
+    result = list(client.query(query).result())[0]
+    return jsonify({"total_trials": result["total_trials"], "cities": list(result["cities"])})
 
 
 @app.route("/api/search/sql")
