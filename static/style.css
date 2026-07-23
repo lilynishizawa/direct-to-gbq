@@ -1,43 +1,44 @@
 :root {
-  --bg: #f4f6fb;
-  --panel: #ffffff;
-  --panel-alt: #f8f9fc;
-  --border: #e5e8f0;
-  --border-strong: #cdd3e0;
-  --text: #14161f;
-  --muted: #666d80;
-  --accent: #4338ca;
-  --accent-2: #7c3aed;
-  --accent-hover: #362ea8;
-  --accent-soft: #eeecfd;
-  --accent-text: #ffffff;
-  --row-hover: #f5f4ff;
-  --header-bg: #f8f9fc;
-  --shadow: 0 1px 2px rgba(20, 24, 45, 0.04), 0 10px 30px rgba(20, 24, 45, 0.07);
-  --shadow-lg: 0 4px 10px rgba(20, 24, 45, 0.05), 0 20px 45px rgba(20, 24, 45, 0.1);
+  --bg: #f6f1e7;
+  --panel: #fffdf9;
+  --panel-alt: #f3ecdd;
+  --border: #e8dfcc;
+  --border-strong: #d6c9ac;
+  --text: #221c14;
+  --muted: #776b58;
+  --accent: #e14a1f;
+  --accent-2: #f0a300;
+  --accent-hover: #c53c17;
+  --accent-soft: #fce3d4;
+  --accent-text: #fffaf4;
+  --row-hover: #fbeee2;
+  --header-bg: #f3ecdd;
+  --shadow: 0 1px 2px rgba(40, 30, 12, 0.05), 0 10px 30px rgba(40, 30, 12, 0.08);
+  --shadow-lg: 0 4px 10px rgba(40, 30, 12, 0.06), 0 20px 45px rgba(40, 30, 12, 0.12);
   --radius: 14px;
-  --danger: #dc2626;
+  --danger: #c81e3a;
+  --font-display: "Fraunces", Georgia, serif;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #101117;
-    --panel: #191b23;
-    --panel-alt: #1f212b;
-    --border: #2c2f3b;
-    --border-strong: #3a3e4d;
-    --text: #eceef4;
-    --muted: #9aa0b4;
-    --accent: #8b7bff;
-    --accent-2: #a78bfa;
-    --accent-hover: #a396ff;
-    --accent-soft: #262547;
-    --accent-text: #0b0d10;
-    --row-hover: #21223a;
-    --header-bg: #171922;
+    --bg: #18130f;
+    --panel: #221b15;
+    --panel-alt: #29211a;
+    --border: #3c3125;
+    --border-strong: #4d3f2e;
+    --text: #f6efe2;
+    --muted: #b3a58c;
+    --accent: #ff7a45;
+    --accent-2: #ffc247;
+    --accent-hover: #ff8f61;
+    --accent-soft: #402615;
+    --accent-text: #1c1006;
+    --row-hover: #2e2417;
+    --header-bg: #1e1712;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 30px rgba(0, 0, 0, 0.4);
     --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.35), 0 24px 50px rgba(0, 0, 0, 0.45);
-    --danger: #f87171;
+    --danger: #f4735c;
   }
 }
 
@@ -54,6 +55,17 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+h1, .page-heading, .hero-line, .criteria-heading,
+#modal-body h2, #sql-modal h2, #fuzzy-modal h2 {
+  font-family: var(--font-display);
+}
+
+.page-heading em, .hero-line em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--accent);
+}
+
 /* Soft ambient glow instead of a literal graphic -- adds depth to the page
    without competing with the content on top of it. */
 body::before {
@@ -62,8 +74,8 @@ body::before {
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(650px circle at 12% -8%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
-    radial-gradient(550px circle at 92% 6%, color-mix(in srgb, var(--accent-2) 12%, transparent), transparent 60%);
+    radial-gradient(650px circle at 12% -8%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
+    radial-gradient(550px circle at 92% 6%, color-mix(in srgb, var(--accent-2) 14%, transparent), transparent 60%);
   pointer-events: none;
 }
 
@@ -155,10 +167,10 @@ header {
   width: 2.5rem;
   height: 2.5rem;
   flex-shrink: 0;
-  border-radius: 11px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  border-radius: 50%;
+  background: var(--accent);
   box-shadow: 0 6px 16px -4px color-mix(in srgb, var(--accent) 55%, transparent);
-  color: #fff;
+  color: var(--accent-text);
   font-weight: 700;
   font-size: 0.9rem;
   letter-spacing: 0.02em;
@@ -166,9 +178,9 @@ header {
 
 header h1 {
   margin: 0;
-  font-size: 1.2rem;
-  font-weight: 700;
-  letter-spacing: -0.015em;
+  font-size: 1.25rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 .subtitle {
@@ -212,32 +224,50 @@ main {
 /* ---------- Landing hero ---------- */
 
 .hero-card {
-  margin: 0 0 2rem;
-  padding: 1.6rem 1.8rem;
+  position: relative;
+  margin: 0 0 2.25rem;
+  padding: 2rem 2rem;
   border-radius: var(--radius);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 9%, var(--panel)), color-mix(in srgb, var(--accent-2) 7%, var(--panel)));
+  background: color-mix(in srgb, var(--accent) 6%, var(--panel));
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
+  overflow: hidden;
 }
 
+/* Floating accent circles -- a decorative echo of the reference site's
+   brand motif, purely for visual texture. */
+.hero-dot {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: var(--accent-2);
+  opacity: 0.35;
+}
+
+.hero-dot-1 { width: 90px; height: 90px; top: -30px; left: 8%; }
+.hero-dot-2 { width: 34px; height: 34px; top: 20px; left: 30%; background: var(--accent); opacity: 0.25; }
+.hero-dot-3 { width: 54px; height: 54px; bottom: -22px; right: 12%; }
+
 .hero-line {
+  position: relative;
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-  line-height: 1.4;
+  font-size: 1.85rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
 }
 
 .stat-pill {
   display: inline-flex;
   align-items: center;
-  vertical-align: -0.05em;
-  padding: 0.1rem 0.65rem;
+  vertical-align: -0.1em;
+  padding: 0.15rem 0.8rem;
   border-radius: 999px;
-  background: var(--panel);
-  border: 1px solid var(--border);
+  background: var(--accent);
+  border: 1px solid transparent;
   box-shadow: var(--shadow);
-  color: var(--accent);
+  color: var(--accent-text);
+  font-family: "Inter", sans-serif;
   font-weight: 700;
 }
 
@@ -559,8 +589,8 @@ select[id="healthy_volunteers"], select[id="has_results"], select[id="sort"], se
 button {
   font: inherit;
   font-weight: 600;
-  padding: 0.6rem 1.25rem;
-  border-radius: 9px;
+  padding: 0.65rem 1.4rem;
+  border-radius: 999px;
   border: 1px solid var(--border-strong);
   background: var(--panel);
   color: var(--text);
@@ -586,16 +616,17 @@ button:focus-visible {
 }
 
 #searchBtn, #sql-run-btn, #fuzzy-run-btn {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background: var(--accent);
   color: var(--accent-text);
-  border-color: transparent;
+  border-color: var(--accent);
   font-weight: 700;
-  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--accent) 60%, transparent);
+  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
 #searchBtn:hover, #sql-run-btn:hover, #fuzzy-run-btn:hover:not(:disabled) {
-  filter: brightness(1.06);
-  box-shadow: 0 8px 20px -6px color-mix(in srgb, var(--accent) 70%, transparent);
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  box-shadow: 0 8px 20px -6px color-mix(in srgb, var(--accent) 65%, transparent);
 }
 
 #searchBtn:disabled, #sql-run-btn:disabled, #fuzzy-run-btn:disabled {

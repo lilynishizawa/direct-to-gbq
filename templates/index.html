@@ -6,7 +6,7 @@
   <title>Clinical Trials Explorer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ asset_version('style.css') }}">
 </head>
 <body>
@@ -34,10 +34,13 @@
     <!-- ============ VIEW: landing ============ -->
     <section id="view-landing" class="view">
       <div class="hero-card">
-        <h2 class="hero-line">Search through <span id="stat-total" class="stat-pill stat-total">&hellip;</span> trials in <span id="stat-city" class="stat-pill city-flip">&hellip;</span></h2>
+        <span class="hero-dot hero-dot-1" aria-hidden="true"></span>
+        <span class="hero-dot hero-dot-2" aria-hidden="true"></span>
+        <span class="hero-dot hero-dot-3" aria-hidden="true"></span>
+        <h2 class="hero-line">Search through <span id="stat-total" class="stat-pill stat-total">&hellip;</span> <em>trials in</em> <span id="stat-city" class="stat-pill city-flip">&hellip;</span></h2>
       </div>
 
-      <h2 class="page-heading">Get Started</h2>
+      <h2 class="page-heading">Get <em>Started</em></h2>
 
       <div class="privacy-row">
         <span class="privacy-text">Easy, secure, private:</span>
@@ -211,7 +214,7 @@
 
     <!-- ============ VIEW: results ============ -->
     <section id="view-results" class="view hidden">
-      <h2 class="page-heading">Results</h2>
+      <h2 class="page-heading"><em>Results</em></h2>
       <section id="status-bar"></section>
       <section id="results">
         <table id="results-table">
@@ -254,7 +257,7 @@
 
     <!-- ============ VIEW: ai-results ============ -->
     <section id="view-ai-results" class="view hidden">
-      <h2 class="page-heading">AI Scanned Results</h2>
+      <h2 class="page-heading">AI Scanned <em>Results</em></h2>
       <p id="results-eligibility-summary" class="results-eligibility-summary"></p>
 
       <section id="ai-results">
