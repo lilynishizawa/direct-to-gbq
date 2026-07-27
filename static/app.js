@@ -21,7 +21,25 @@ const SEARCH_COLUMNS = [
   { key: "study_type", label: "Study type" },
   { key: "start_date", label: "Start date" },
   { key: "lead_sponsor", label: "Sponsor" },
-  { key: "lead_sponsor_class", label: "Sponsor class" },
+  {
+    key: "locations",
+    label: "Location",
+    format: (v) => {
+      const locs = v || [];
+      const unique = [];
+      const seen = new Set();
+      for (const l of locs) {
+        const label = [l.city, l.state, l.country].filter(Boolean).join(", ");
+        if (label && !seen.has(label)) {
+          seen.add(label);
+          unique.push(label);
+        }
+      }
+      if (unique.length === 0) return "";
+      const shown = unique.slice(0, 3).join("; ");
+      return unique.length > 3 ? `${shown} (+${unique.length - 3} more)` : shown;
+    },
+  },
   { key: "enrollment_count", label: "Enrollment" },
   { key: "sex", label: "Sex" },
   { key: "has_results", label: "Has results", format: (v) => (v ? "Yes" : "No") },
@@ -428,11 +446,20 @@ async function goSearch() {
     requestSearchApproval(1);
     return;
   }
-  const ok = await runSearch(1);
-  if (ok) {
-    state.approvedSignature = filterSignature();
-    showView("results");
-    refreshFuzzyCandidates();
+  const searchBtn = document.getElementById("searchBtn");
+  const originalLabel = searchBtn.textContent;
+  searchBtn.disabled = true;
+  searchBtn.innerHTML = '<span class="spinner" aria-hidden="true"></span>Searching...';
+  try {
+    const ok = await runSearch(1);
+    if (ok) {
+      state.approvedSignature = filterSignature();
+      showView("results");
+      refreshFuzzyCandidates();
+    }
+  } finally {
+    searchBtn.disabled = false;
+    searchBtn.textContent = originalLabel;
   }
 }
 

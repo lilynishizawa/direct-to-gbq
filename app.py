@@ -73,8 +73,8 @@ SORTABLE_COLUMNS = {
 
 LIST_COLUMNS = """
     nct_id, brief_title, overall_status, study_type, phases, start_date,
-    primary_completion_date, lead_sponsor, lead_sponsor_class, conditions,
-    enrollment_count, sex, has_results
+    primary_completion_date, lead_sponsor, conditions,
+    enrollment_count, sex, has_results, locations
 """
 
 app = Flask(__name__)
