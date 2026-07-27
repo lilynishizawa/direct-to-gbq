@@ -620,31 +620,36 @@ def api_fuzzy_match_candidates():
     where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
 
     try:
-        count_query = f"SELECT COUNT(*) AS total FROM {TABLE_REF} WHERE {where_sql}"
-        job_config = bigquery.QueryJobConfig(query_parameters=params)
-        total = list(client.query(count_query, job_config=job_config).result())[0]["total"]
-
-        if total > FUZZY_MATCH_MAX_TRIALS:
-            return jsonify({"total": total, "trials": None})
-
+        # One query instead of a count-then-fetch pair: COUNT(*) OVER() gets
+        # the true total (computed before the LIMIT is applied), and the
+        # LIMIT is set one above the cap so we still learn the total even
+        # when it exceeds FUZZY_MATCH_MAX_TRIALS, without pulling back every
+        # matching row's full detail columns when there's no use for them.
+        #
         # Full LIST_COLUMNS (not just nct_id/brief_title) so the AI Scanned
         # Results page can render these rows directly -- this candidate list
         # is independently ordered by nct_id regardless of the hard-search
         # page's own sort/pagination, so joining eligibility results back
         # onto the hard-search page's rows would silently drop trials
         # whenever the two orderings diverge.
-        detail_query = f"""
-            SELECT {LIST_COLUMNS}
+        query = f"""
+            SELECT {LIST_COLUMNS}, COUNT(*) OVER() AS total_count
             FROM {TABLE_REF}
             WHERE {where_sql}
             ORDER BY nct_id
-            LIMIT {FUZZY_MATCH_MAX_TRIALS}
+            LIMIT {FUZZY_MATCH_MAX_TRIALS + 1}
         """
         job_config = bigquery.QueryJobConfig(query_parameters=params)
-        rows = [row_to_dict(r) for r in client.query(detail_query, job_config=job_config).result()]
+        rows = [row_to_dict(r) for r in client.query(query, job_config=job_config).result()]
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
+    total = rows[0].pop("total_count") if rows else 0
+    if total > FUZZY_MATCH_MAX_TRIALS:
+        return jsonify({"total": total, "trials": None})
+
+    for r in rows:
+        r.pop("total_count", None)
     return jsonify({"total": total, "trials": rows})
 
 
