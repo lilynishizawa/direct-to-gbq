@@ -1,0 +1,8 @@
+.gcloudignore
+.git
+.gitignore
+
+.vscode/settings.json
+.claude/
+__pycache__/
+to_do.txt
