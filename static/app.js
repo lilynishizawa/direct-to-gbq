@@ -675,8 +675,9 @@ async function runFuzzyMatchDirect() {
   const statusEl = document.getElementById("fuzzy-status");
   runBtn.disabled = true;
   const originalLabel = runBtn.textContent;
-  runBtn.textContent = "Running...";
-  statusEl.textContent = "Running AI match...";
+  runBtn.innerHTML = '<span class="spinner" aria-hidden="true"></span>Running...';
+  statusEl.classList.add("is-loading");
+  statusEl.innerHTML = '<span class="spinner" aria-hidden="true"></span>Running AI match... this can take a minute.';
 
   try {
     const resp = await fetch("/api/fuzzy-match/run", {
@@ -696,6 +697,7 @@ async function runFuzzyMatchDirect() {
   } finally {
     runBtn.disabled = false;
     runBtn.textContent = originalLabel;
+    statusEl.classList.remove("is-loading");
   }
 }
 
@@ -757,7 +759,7 @@ async function runFuzzyMatchAi() {
   errorBox.textContent = "";
   btn.disabled = true;
   const originalLabel = btn.textContent;
-  btn.textContent = "Running...";
+  btn.innerHTML = '<span class="spinner" aria-hidden="true"></span>Running...';
 
   const patient = getPatientProfile();
   try {

@@ -973,6 +973,31 @@ tbody tr:hover { background: var(--row-hover); }
   color: var(--muted);
 }
 
+/* ---------- Loading spinner ---------- */
+
+.spinner {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin-right: 0.4em;
+  vertical-align: -0.15em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.fuzzy-status.is-loading {
+  display: flex;
+  align-items: center;
+  color: var(--text);
+  font-weight: 600;
+}
+
 .fuzzy-warning {
   margin-top: 0.9rem;
   padding: 0.7rem 0.9rem;
