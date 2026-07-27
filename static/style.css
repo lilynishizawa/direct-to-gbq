@@ -266,19 +266,20 @@ main {
 
 .hero-stat-card {
   padding: 1rem 2rem;
-  text-align: center;
+  text-align: left;
   margin-bottom: 1.25rem;
 }
 
 .hero-stat-card .hero-stat-line {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
   gap: 0.4rem;
   margin: 0;
   padding: 0;
   border-bottom: none;
+  font-size: 1.3rem;
 }
 
 .hero-line {
@@ -404,13 +405,6 @@ main {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
   box-shadow: 0 12px 28px -8px color-mix(in srgb, var(--accent) 70%, transparent);
-}
-
-.hero-stat-line {
-  margin: 0 0 1.4rem;
-  padding-bottom: 1.4rem;
-  border-bottom: 1px solid var(--border);
-  font-size: 1rem;
 }
 
 .hard-search-toggle {
