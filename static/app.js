@@ -135,8 +135,13 @@ function showNextCity(immediate) {
 }
 
 function updateTriggerText(id) {
-  const count = document.querySelectorAll(`#${id}-panel .ms-option.selected`).length;
-  document.getElementById(`${id}-text`).textContent = count === 0 ? "Any" : `${count} selected`;
+  const selected = Array.from(document.querySelectorAll(`#${id}-panel .ms-option.selected`));
+  const textEl = document.getElementById(`${id}-text`);
+  if (selected.length === 0) {
+    textEl.textContent = "Any";
+    return;
+  }
+  textEl.textContent = selected.map((o) => o.querySelector("span:last-child").textContent).join(", ");
 }
 
 function populateFacetSelects() {
@@ -446,6 +451,15 @@ function describeExtraction(data) {
   return `${filledMsg}${notesMsg}`;
 }
 
+function setHardSearchExpanded(expanded) {
+  const toggleBtn = document.getElementById("hard-search-toggle");
+  const filtersForm = document.getElementById("filters");
+  filtersForm.classList.toggle("hidden", !expanded);
+  toggleBtn.setAttribute("aria-expanded", String(expanded));
+  toggleBtn.classList.toggle("open", expanded);
+  if (expanded) filtersForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
 async function handleFileUpload(file) {
   const statusEl = document.getElementById("upload-status");
   statusEl.classList.remove("upload-error");
@@ -491,6 +505,7 @@ async function handleFileUpload(file) {
   state.hasUploadedFile = true;
   document.getElementById("criteria-heading").textContent = "Please confirm:";
   statusEl.textContent = describeExtraction(data);
+  setHardSearchExpanded(true);
 }
 
 // ---------- Fuzzy match ----------
@@ -916,12 +931,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("click", () => hidePrivacyPopover());
 
   document.getElementById("hard-search-toggle").addEventListener("click", () => {
-    const toggleBtn = document.getElementById("hard-search-toggle");
-    const filtersForm = document.getElementById("filters");
-    const expanded = filtersForm.classList.toggle("hidden") === false;
-    toggleBtn.setAttribute("aria-expanded", String(expanded));
-    toggleBtn.classList.toggle("open", expanded);
-    if (expanded) filtersForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    setHardSearchExpanded(document.getElementById("filters").classList.contains("hidden"));
   });
 
   document.getElementById("upload-trigger-btn").addEventListener("click", () => {
