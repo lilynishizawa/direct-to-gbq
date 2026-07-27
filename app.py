@@ -223,6 +223,15 @@ def build_filter_clauses(args):
         where_clauses.append("LOWER(lead_sponsor) LIKE @sponsor")
         params.append(bigquery.ScalarQueryParameter("sponsor", "STRING", f"%{sponsor.lower()}%"))
 
+    location = args.get("location", "").strip()
+    if location:
+        where_clauses.append(
+            "EXISTS (SELECT 1 FROM UNNEST(locations) AS loc WHERE "
+            "LOWER(loc.city) LIKE @location OR LOWER(loc.state) LIKE @location "
+            "OR LOWER(loc.country) LIKE @location)"
+        )
+        params.append(bigquery.ScalarQueryParameter("location", "STRING", f"%{location.lower()}%"))
+
     def multi_filter(field, param_name, values, scalar_when_single=False):
         values = [v for v in values if v]
         if not values:

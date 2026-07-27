@@ -234,6 +234,20 @@ main {
   overflow: hidden;
 }
 
+/* The upload hero is the primary call to action on the landing page, so it
+   gets extra padding, centered content, and a bolder shadow to visually
+   outrank the "fill out fields" form beneath it. */
+.hero-upload-card {
+  padding: 2.75rem 2rem 2.25rem;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+
+.hero-headline {
+  font-size: 2.1rem;
+  font-weight: 600;
+}
+
 /* Floating accent circles -- a decorative echo of the reference site's
    brand motif, purely for visual texture. */
 .hero-dot {
@@ -280,17 +294,21 @@ main {
   transform: translateY(-0.3em);
 }
 
-/* ---------- Privacy info dot ---------- */
+/* ---------- Hero subtitle + privacy info dot ---------- */
 
-.privacy-row {
+.hero-subtitle-row {
+  position: relative;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.4rem;
-  margin-bottom: 0.3rem;
+  margin: 0.5rem 0 1.6rem;
 }
 
-.privacy-text {
+.hero-subtitle {
+  font-size: 1rem;
   font-weight: 700;
+  color: var(--muted);
 }
 
 .info-dot-wrap {
@@ -347,6 +365,50 @@ main {
 .upload-actions {
   margin-top: 0;
   margin-bottom: 0.3rem;
+}
+
+.upload-actions-hero {
+  justify-content: center;
+  margin-bottom: 0.9rem;
+}
+
+.btn-hero {
+  padding: 1rem 2.6rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+  box-shadow: 0 10px 24px -8px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.btn-hero:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  box-shadow: 0 12px 28px -8px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.hero-stat-line {
+  margin: 0 0 1.4rem;
+  padding-bottom: 1.4rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 1rem;
+}
+
+.find-files-prompt {
+  margin: 0 0 1.6rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.find-files-prompt a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.required-mark {
+  color: var(--accent);
 }
 
 /* ---------- Criteria card heading ---------- */
@@ -450,6 +512,10 @@ details.filter-section > summary.section-title:hover {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+}
+
+.refine-grid {
+  margin-top: 0.9rem;
 }
 
 .filter-label {

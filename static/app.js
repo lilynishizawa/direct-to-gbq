@@ -209,9 +209,11 @@ function buildParams(page) {
   const keyword = document.getElementById("keyword").value.trim();
   const condition = document.getElementById("condition").value.trim();
   const sponsor = document.getElementById("sponsor").value.trim();
+  const location = document.getElementById("location").value.trim();
   if (keyword) params.set("keyword", keyword);
   if (condition) params.set("condition", condition);
   if (sponsor) params.set("sponsor", sponsor);
+  if (location) params.set("location", location);
   const age = document.getElementById("age").value.trim();
   if (age) params.set("age", age);
 
@@ -947,7 +949,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("upload-status").textContent = "";
     document.getElementById("upload-status").classList.remove("upload-error");
     document.getElementById("patient-notes").value = "";
-    document.getElementById("criteria-heading").textContent = "Or, fill out fields below";
+    document.getElementById("criteria-heading").textContent = "Fill out fields below";
 
     resetFuzzyPanel("Run a search to see how many trials qualify for AI matching.");
   });

@@ -33,32 +33,34 @@
 
     <!-- ============ VIEW: landing ============ -->
     <section id="view-landing" class="view">
-      <div class="hero-card">
+      <div class="hero-card hero-upload-card">
         <span class="hero-dot hero-dot-1" aria-hidden="true"></span>
         <span class="hero-dot hero-dot-2" aria-hidden="true"></span>
         <span class="hero-dot hero-dot-3" aria-hidden="true"></span>
-        <h2 class="hero-line">Search through <span id="stat-total" class="stat-pill stat-total">&hellip;</span> <em>trials in</em> <span id="stat-city" class="stat-pill city-flip">&hellip;</span></h2>
+        <p class="hero-stat-line">Search through <span id="stat-total" class="stat-pill stat-total">&hellip;</span> <em>trials in</em> <span id="stat-city" class="stat-pill city-flip">&hellip;</span></p>
+
+        <h2 class="hero-line hero-headline">Fastest and most accurate results</h2>
+        <div class="hero-subtitle-row">
+          <span class="hero-subtitle">Easy, secure, private</span>
+          <span class="info-dot-wrap">
+            <button type="button" id="privacy-info-btn" class="info-dot" aria-label="More information">?</button>
+            <div id="privacy-popover" class="popover hidden">More information coming</div>
+          </span>
+        </div>
+
+        <div class="actions upload-actions upload-actions-hero">
+          <button type="button" id="upload-trigger-btn" class="btn-hero">Upload file</button>
+          <input type="file" id="patient-file-input" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.txt" class="visually-hidden">
+        </div>
+        <p class="upload-caption">Upload your medical file (MyChart)</p>
+        <p id="upload-status" class="upload-status"></p>
       </div>
 
-      <h2 class="page-heading">Get <em>Started</em></h2>
-
-      <div class="privacy-row">
-        <span class="privacy-text">Easy, secure, private:</span>
-        <span class="info-dot-wrap">
-          <button type="button" id="privacy-info-btn" class="info-dot" aria-label="More information">?</button>
-          <div id="privacy-popover" class="popover hidden">More information coming</div>
-        </span>
-      </div>
-      <p class="upload-caption">Upload your medical file (MyChart)</p>
-      <div class="actions upload-actions">
-        <button type="button" id="upload-trigger-btn" class="btn-ghost">Upload file</button>
-        <input type="file" id="patient-file-input" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.txt" class="visually-hidden">
-      </div>
-      <p id="upload-status" class="upload-status"></p>
+      <p class="find-files-prompt">Can't find your medical files? <a href="#filters">Fill out fields below</a></p>
 
       <form id="filters">
         <div class="filter-card">
-          <h3 id="criteria-heading" class="criteria-heading">Or, fill out fields below</h3>
+          <h3 id="criteria-heading" class="criteria-heading">Fill out fields below</h3>
 
           <div class="filter-section">
             <h2 class="section-title">Search</h2>
@@ -68,12 +70,22 @@
                 <input type="text" id="keyword" placeholder="title / summary contains...">
               </label>
               <label>
-                <span class="filter-label">Condition</span>
-                <input type="text" id="condition" placeholder="e.g. diabetes">
+                <span class="filter-label">Condition <span class="required-mark" aria-hidden="true">*</span></span>
+                <input type="text" id="condition" placeholder="e.g. diabetes" required>
               </label>
+              <div class="ms-field">
+                <span class="filter-label">Sex</span>
+                <div class="ms-dropdown">
+                  <button type="button" class="ms-trigger" id="sex-trigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="ms-trigger-text" id="sex-text">Any</span>
+                    <span class="ms-caret" aria-hidden="true">&#9662;</span>
+                  </button>
+                  <div class="ms-panel hidden" id="sex-panel" role="listbox" aria-multiselectable="true"></div>
+                </div>
+              </div>
               <label>
-                <span class="filter-label">Sponsor name</span>
-                <input type="text" id="sponsor" placeholder="e.g. pfizer">
+                <span class="filter-label">Location</span>
+                <input type="text" id="location" placeholder="city, state, or country">
               </label>
               <label>
                 <span class="filter-label">Patient age (years)</span>
@@ -82,8 +94,8 @@
             </div>
           </div>
 
-          <div class="filter-section">
-            <h2 class="section-title">Facets</h2>
+          <details class="filter-section" id="refine-section">
+            <summary class="section-title">Refine</summary>
             <div class="dropdown-filter-grid">
               <div class="ms-field">
                 <span class="filter-label">Status</span>
@@ -125,22 +137,12 @@
                   <div class="ms-panel hidden" id="sponsor_class-panel" role="listbox" aria-multiselectable="true"></div>
                 </div>
               </div>
-              <div class="ms-field">
-                <span class="filter-label">Sex</span>
-                <div class="ms-dropdown">
-                  <button type="button" class="ms-trigger" id="sex-trigger" aria-haspopup="listbox" aria-expanded="false">
-                    <span class="ms-trigger-text" id="sex-text">Any</span>
-                    <span class="ms-caret" aria-hidden="true">&#9662;</span>
-                  </button>
-                  <div class="ms-panel hidden" id="sex-panel" role="listbox" aria-multiselectable="true"></div>
-                </div>
-              </div>
             </div>
-          </div>
-
-          <details class="filter-section" id="refine-section">
-            <summary class="section-title">Refine</summary>
-            <div class="filter-grid">
+            <div class="filter-grid refine-grid">
+              <label>
+                <span class="filter-label">Sponsor name</span>
+                <input type="text" id="sponsor" placeholder="e.g. pfizer">
+              </label>
               <label>
                 <span class="filter-label">Healthy volunteers</span>
                 <select id="healthy_volunteers">
