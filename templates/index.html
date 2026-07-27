@@ -33,12 +33,14 @@
 
     <!-- ============ VIEW: landing ============ -->
     <section id="view-landing" class="view">
-      <div class="hero-card hero-upload-card">
+      <div class="hero-card hero-stat-card">
         <span class="hero-dot hero-dot-1" aria-hidden="true"></span>
         <span class="hero-dot hero-dot-2" aria-hidden="true"></span>
-        <span class="hero-dot hero-dot-3" aria-hidden="true"></span>
         <p class="hero-stat-line">Search through <span id="stat-total" class="stat-pill stat-total">&hellip;</span> <em>trials in</em> <span id="stat-city" class="stat-pill city-flip">&hellip;</span></p>
+      </div>
 
+      <div class="hero-card hero-upload-card">
+        <span class="hero-dot hero-dot-3" aria-hidden="true"></span>
         <h2 class="hero-line hero-headline">Fastest and most accurate results</h2>
         <div class="hero-subtitle-row">
           <span class="hero-subtitle">Easy, secure, private</span>
@@ -56,9 +58,12 @@
         <p id="upload-status" class="upload-status"></p>
       </div>
 
-      <p class="find-files-prompt">Can't find your medical files? <a href="#filters">Fill out fields below</a></p>
+      <button type="button" id="hard-search-toggle" class="hard-search-toggle" aria-expanded="false" aria-controls="filters">
+        <span class="hard-search-toggle-text">Can't find your medical files? <span class="hard-search-toggle-link">Fill out fields below</span></span>
+        <span class="hard-search-chevron" aria-hidden="true">&#9662;</span>
+      </button>
 
-      <form id="filters">
+      <form id="filters" class="hidden">
         <div class="filter-card">
           <h3 id="criteria-heading" class="criteria-heading">Fill out fields below</h3>
 

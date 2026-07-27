@@ -262,6 +262,20 @@ main {
 .hero-dot-2 { width: 34px; height: 34px; top: 20px; left: 30%; background: var(--accent); opacity: 0.25; }
 .hero-dot-3 { width: 54px; height: 54px; bottom: -22px; right: 12%; }
 
+/* ---------- Stat line card (separate pill card above the upload hero) ---------- */
+
+.hero-stat-card {
+  padding: 1rem 2rem;
+  text-align: center;
+  margin-bottom: 1.25rem;
+}
+
+.hero-stat-card .hero-stat-line {
+  margin: 0;
+  padding: 0;
+  border-bottom: none;
+}
+
 .hero-line {
   position: relative;
   margin: 0;
@@ -395,16 +409,45 @@ main {
   font-size: 1rem;
 }
 
-.find-files-prompt {
+.hard-search-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  width: 100%;
   margin: 0 0 1.6rem;
-  text-align: center;
+  padding: 0.9rem 1.5rem;
+  border: none;
+  border-radius: 10px;
+  background: var(--panel-alt);
   color: var(--muted);
+  font: inherit;
   font-size: 0.9rem;
+  text-align: center;
 }
 
-.find-files-prompt a {
+.hard-search-toggle:hover {
+  background: var(--border);
+}
+
+.hard-search-toggle-link {
   color: var(--accent);
   font-weight: 600;
+  text-decoration: underline;
+}
+
+.hard-search-chevron {
+  color: var(--muted);
+  font-size: 0.8rem;
+  transition: transform 0.15s ease;
+}
+
+.hard-search-toggle.open .hard-search-chevron {
+  transform: rotate(180deg);
+}
+
+#filters.hidden {
+  display: none;
 }
 
 .required-mark {

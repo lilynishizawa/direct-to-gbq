@@ -915,6 +915,15 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document.addEventListener("click", () => hidePrivacyPopover());
 
+  document.getElementById("hard-search-toggle").addEventListener("click", () => {
+    const toggleBtn = document.getElementById("hard-search-toggle");
+    const filtersForm = document.getElementById("filters");
+    const expanded = filtersForm.classList.toggle("hidden") === false;
+    toggleBtn.setAttribute("aria-expanded", String(expanded));
+    toggleBtn.classList.toggle("open", expanded);
+    if (expanded) filtersForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+
   document.getElementById("upload-trigger-btn").addEventListener("click", () => {
     document.getElementById("patient-file-input").click();
   });
