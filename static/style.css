@@ -271,6 +271,11 @@ main {
 }
 
 .hero-stat-card .hero-stat-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
   margin: 0;
   padding: 0;
   border-bottom: none;
@@ -288,7 +293,6 @@ main {
 .stat-pill {
   display: inline-flex;
   align-items: center;
-  vertical-align: -0.1em;
   padding: 0.15rem 0.8rem;
   border-radius: 999px;
   background: var(--accent);
