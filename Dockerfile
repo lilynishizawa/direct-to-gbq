@@ -8,6 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py .
 COPY condition_synonyms.py .
 COPY mesh_lookup.py .
+COPY mesh_synonym_cache.json .
 COPY static/ static/
 COPY templates/ templates/
 

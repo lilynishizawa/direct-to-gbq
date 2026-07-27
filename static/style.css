@@ -693,6 +693,10 @@ select[id="healthy_volunteers"], select[id="has_results"], select[id="sort"], se
   gap: 0.6rem;
 }
 
+.filter-card-actions {
+  justify-content: space-between;
+}
+
 button {
   font: inherit;
   font-weight: 600;
