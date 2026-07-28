@@ -448,12 +448,30 @@ async function requestSearchApproval(page) {
   }
 }
 
-function goToPage(page) {
+async function goToPage(page) {
   if (state.customMode) return;
   if (state.approvedSignature === filterSignature()) {
-    runSearch(page);
+    await runSearch(page);
   } else {
-    requestSearchApproval(page);
+    await requestSearchApproval(page);
+  }
+}
+
+// Pagination re-runs a search against BigQuery, so it can take a moment --
+// show a spinner on whichever page button was clicked while it's in flight.
+async function goToPageWithSpinner(btn, page) {
+  const otherBtn = document.getElementById(btn.id === "prevPage" ? "nextPage" : "prevPage");
+  const originalLabel = btn.innerHTML;
+  btn.disabled = true;
+  otherBtn.disabled = true;
+  btn.innerHTML = `<span class="spinner" aria-hidden="true"></span>${btn.textContent}`;
+  try {
+    await goToPage(page);
+  } finally {
+    btn.innerHTML = originalLabel;
+    // runSearch()/requestSearchApproval() set the real enabled state based on the new page.
+    btn.disabled = false;
+    otherBtn.disabled = false;
   }
 }
 
@@ -1020,10 +1038,10 @@ document.addEventListener("DOMContentLoaded", () => {
     resetFuzzyPanel("Run a search to see how many trials qualify for AI matching.");
   });
 
-  document.getElementById("prevPage").addEventListener("click", () => {
-    if (state.page > 1) goToPage(state.page - 1);
+  document.getElementById("prevPage").addEventListener("click", (e) => {
+    if (state.page > 1) goToPageWithSpinner(e.currentTarget, state.page - 1);
   });
-  document.getElementById("nextPage").addEventListener("click", () => goToPage(state.page + 1));
+  document.getElementById("nextPage").addEventListener("click", (e) => goToPageWithSpinner(e.currentTarget, state.page + 1));
 
   document.getElementById("aiPrevPage").addEventListener("click", () => {
     if (state.aiPage > 1) {
@@ -1053,6 +1071,8 @@ document.addEventListener("DOMContentLoaded", () => {
     errorBox.classList.add("hidden");
     errorBox.textContent = "";
     btn.disabled = true;
+    const originalLabel = btn.textContent;
+    btn.innerHTML = '<span class="spinner" aria-hidden="true"></span>Running...';
 
     let ok;
     if (currentSql.trim() === state.originalSql.trim()) {
@@ -1071,6 +1091,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     btn.disabled = false;
+    btn.textContent = originalLabel;
     if (ok) {
       hideSqlModal();
     } else {
