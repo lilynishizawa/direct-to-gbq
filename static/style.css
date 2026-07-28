@@ -685,6 +685,21 @@ select[id="healthy_volunteers"], select[id="has_results"], select[id="sort"], se
 .ms-option.selected .ms-check { opacity: 1; }
 .ms-option.selected { font-weight: 600; }
 
+.ms-group-label {
+  padding: 0.5rem 0.5rem 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.ms-group-label:not(:first-child) {
+  margin-top: 0.3rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+}
+
 /* ---------- Actions / buttons ---------- */
 
 .actions {

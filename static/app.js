@@ -1,10 +1,19 @@
 const FACETS = {
-  status: [
-    "ACTIVE_NOT_RECRUITING", "COMPLETED", "ENROLLING_BY_INVITATION",
-    "NOT_YET_RECRUITING", "RECRUITING", "SUSPENDED", "TERMINATED",
-    "WITHDRAWN", "AVAILABLE", "NO_LONGER_AVAILABLE",
-    "TEMPORARILY_NOT_AVAILABLE", "APPROVED_FOR_MARKETING", "WITHHELD", "UNKNOWN",
-  ],
+  // An object (instead of a flat array) renders as labeled groups in the
+  // dropdown -- used here to separate ordinary trial statuses from
+  // Expanded Access statuses, which describe compassionate-use access
+  // programs rather than trial enrollment.
+  status: {
+    "Trial status": [
+      "RECRUITING", "NOT_YET_RECRUITING", "ENROLLING_BY_INVITATION",
+      "ACTIVE_NOT_RECRUITING", "SUSPENDED", "UNKNOWN", "COMPLETED",
+      "TERMINATED", "WITHDRAWN",
+    ],
+    "Expanded access status": [
+      "AVAILABLE", "NO_LONGER_AVAILABLE", "TEMPORARILY_NOT_AVAILABLE",
+      "APPROVED_FOR_MARKETING", "WITHHELD",
+    ],
+  },
   study_type: ["INTERVENTIONAL", "OBSERVATIONAL", "EXPANDED_ACCESS"],
   phase: ["EARLY_PHASE1", "PHASE1", "PHASE2", "PHASE3", "PHASE4", "NA"],
   sponsor_class: [
@@ -165,19 +174,28 @@ function updateTriggerText(id) {
 function populateFacetSelects() {
   for (const [id, values] of Object.entries(FACETS)) {
     const panel = document.getElementById(`${id}-panel`);
-    for (const v of values) {
-      const opt = document.createElement("div");
-      opt.className = "ms-option";
-      opt.dataset.value = v;
-      opt.setAttribute("role", "option");
-      opt.setAttribute("aria-selected", "false");
-      opt.innerHTML = `<span class="ms-check" aria-hidden="true">&#10003;</span><span>${escapeHtml(labelize(v))}</span>`;
-      opt.addEventListener("click", () => {
-        const selected = opt.classList.toggle("selected");
-        opt.setAttribute("aria-selected", String(selected));
-        updateTriggerText(id);
-      });
-      panel.appendChild(opt);
+    const groups = Array.isArray(values) ? { "": values } : values;
+    for (const [groupLabel, groupValues] of Object.entries(groups)) {
+      if (groupLabel) {
+        const header = document.createElement("div");
+        header.className = "ms-group-label";
+        header.textContent = groupLabel;
+        panel.appendChild(header);
+      }
+      for (const v of groupValues) {
+        const opt = document.createElement("div");
+        opt.className = "ms-option";
+        opt.dataset.value = v;
+        opt.setAttribute("role", "option");
+        opt.setAttribute("aria-selected", "false");
+        opt.innerHTML = `<span class="ms-check" aria-hidden="true">&#10003;</span><span>${escapeHtml(labelize(v))}</span>`;
+        opt.addEventListener("click", () => {
+          const selected = opt.classList.toggle("selected");
+          opt.setAttribute("aria-selected", String(selected));
+          updateTriggerText(id);
+        });
+        panel.appendChild(opt);
+      }
     }
   }
 }

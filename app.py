@@ -69,7 +69,24 @@ FORBIDDEN_SQL_KEYWORDS = re.compile(
 SORTABLE_COLUMNS = {
     "nct_id", "brief_title", "overall_status", "study_type", "start_date",
     "primary_completion_date", "lead_sponsor", "enrollment_count", "has_results",
+    "availability",
 }
+
+# Ranks each trial status by how likely a patient could actually get into the
+# trial right now (1 = most available), for the "availability" sort option.
+# The five Expanded Access statuses (AVAILABLE .. WITHHELD) describe a
+# compassionate-use access program rather than trial enrollment, so they
+# fall at the bottom regardless.
+STATUS_AVAILABILITY_ORDER = [
+    "RECRUITING", "NOT_YET_RECRUITING", "ENROLLING_BY_INVITATION",
+    "ACTIVE_NOT_RECRUITING", "SUSPENDED", "UNKNOWN", "COMPLETED",
+    "TERMINATED", "WITHDRAWN",
+    "AVAILABLE", "NO_LONGER_AVAILABLE", "TEMPORARILY_NOT_AVAILABLE",
+    "APPROVED_FOR_MARKETING", "WITHHELD",
+]
+STATUS_AVAILABILITY_CASE_SQL = "CASE overall_status " + " ".join(
+    f"WHEN '{status}' THEN {rank}" for rank, status in enumerate(STATUS_AVAILABILITY_ORDER, start=1)
+) + f" ELSE {len(STATUS_AVAILABILITY_ORDER) + 1} END"
 
 LIST_COLUMNS = """
     nct_id, brief_title, overall_status, study_type, phases, start_date,
@@ -332,9 +349,9 @@ def build_search_query(args):
     QueryBuildError on bad input."""
     where_clauses, params = build_filter_clauses(args)
 
-    sort = args.get("sort", "nct_id")
+    sort = args.get("sort", "availability")
     if sort not in SORTABLE_COLUMNS:
-        sort = "nct_id"
+        sort = "availability"
     direction = "DESC" if args.get("dir") == "desc" else "ASC"
 
     try:
@@ -349,11 +366,16 @@ def build_search_query(args):
     offset = (page - 1) * page_size
     where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
 
+    if sort == "availability":
+        order_by_sql = f"{STATUS_AVAILABILITY_CASE_SQL} {direction}, nct_id ASC"
+    else:
+        order_by_sql = f"{sort} {direction}"
+
     query = f"""
         SELECT {LIST_COLUMNS}, COUNT(*) OVER() AS total_count
         FROM {TABLE_REF}
         WHERE {where_sql}
-        ORDER BY {sort} {direction}
+        ORDER BY {order_by_sql}
         LIMIT @page_size OFFSET @offset
     """
     params.append(bigquery.ScalarQueryParameter("page_size", "INT64", page_size))
